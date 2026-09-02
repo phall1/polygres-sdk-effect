@@ -1,0 +1,7 @@
+polygres-sdk-effect
+Copyright 2026 Patrick Hall
+
+This product implements the public Polygres Runtime API contract. Contract snapshots and behavioral references are derived from Evokoa's Apache-2.0-licensed Polygres Python SDK:
+https://github.com/Evokoa/polygres-sdk
+
+Polygres and Evokoa are trademarks of their respective owners. This project is independent and is not currently an official Evokoa distribution.

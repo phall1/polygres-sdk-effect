@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      effect:
+        patterns:
+          - effect
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
