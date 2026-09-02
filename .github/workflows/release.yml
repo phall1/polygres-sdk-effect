@@ -110,7 +110,7 @@ jobs:
       - name: Exercise npm publish without changing the registry
         env:
           TARBALL: ${{ steps.pack.outputs.tarball }}
-        run: npm publish --dry-run "release/$TARBALL"
+        run: npm publish --dry-run "./release/$TARBALL"
       - name: Upload immutable package artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -165,7 +165,7 @@ jobs:
             ' "$published_integrity")"
             test "$published_integrity" = "$local_integrity"
           elif grep -Eq 'E404|404 Not Found' "$error_file"; then
-            npm publish --provenance --access public "release/$TARBALL"
+            npm publish --provenance --access public "./release/$TARBALL"
           else
             cat "$error_file" >&2
             exit "$view_status"
