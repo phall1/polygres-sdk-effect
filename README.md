@@ -1,99 +1,115 @@
-# polygres-sdk-effect
+# Polygres SDK for Effect
 
 [![CI](https://github.com/phall1/polygres-sdk-effect/actions/workflows/ci.yml/badge.svg)](https://github.com/phall1/polygres-sdk-effect/actions/workflows/ci.yml)
 
-Effect-native TypeScript SDK for the [Polygres](https://polygres.com) Runtime API.
+Graph, vector, text, hybrid search, safe row writes, and full pgContext, built directly on Effect.
 
-This independent package is designed as an upstreamable production SDK. It uses Effect services, Layers, Schema, tagged errors, and Stream directly; applications provide the HTTP transport.
+**Contract-pinned. Retry-safe. Worker-ready.**
+
+## Why This SDK
+
+- All 96 pgContext methods, not a partial wrapper
+- Schema-validated inputs and camelCase results
+- Typed failures instead of mystery exceptions
+- Cold Effect streams for cursor pagination
+- Safe idempotency, deadlines, and operation polling
+- Bun, Node.js 20+, and web-standard runtime support
+
+## Try It
+
+```ts
+import { Effect, Redacted } from "effect"
+import { FetchHttpClient } from "effect/unstable/http"
+import { Polygres } from "polygres-sdk-effect"
+
+const results = await Effect.gen(function* () {
+  const db = yield* Polygres.make({
+    apiKey: Redacted.make(process.env.POLY_API_KEY!),
+    projectId: process.env.POLY_PROJECT_ID!,
+  })
+
+  return yield* db.context.search({
+    collection: "documents",
+    embedding: [0.12, -0.08, 0.34],
+    limit: 10,
+  })
+}).pipe(Effect.provide(FetchHttpClient.layer), Effect.runPromise)
+
+console.log(results.results)
+```
+
+Prefer dependency injection? `Polygres.layer(options)` provides the yieldable `Polygres.Client` service.
+
+## API At A Glance
+
+| Need | API |
+| --- | --- |
+| Graph traversal | `db.graph.*` |
+| Vector search | `db.vector.*` |
+| Full-text search | `db.text.*` |
+| Hybrid ranking | `db.hybrid.*` |
+| Insert, upsert, ignore | `db.rows.*` |
+| Collections, points, indexes, search | `db.context.*` |
+| Async operation lifecycle | `db.context.waitForOperation(...)` |
+| Cursor pagination | `operation.page(...)` / `operation.stream(...)` |
+
+Every method takes one object input. Nullable response fields use `Option`. Runtime wire casing stays private.
+
+## Writes That Fail Safely
+
+```ts
+yield* db.rows.upsert({
+  schema: "public",
+  table: "documents",
+  row: { id: "doc-42", body: "Evidence, not vibes." },
+  conflictColumns: ["id"],
+})
+```
+
+- Row writes are never automatically retried.
+- Uncertain outcomes fail as `PolygresError.AmbiguousWrite`.
+- Idempotent Context mutations reuse one exact key and body.
+- `timeout` bounds each attempt; `deadline` bounds the whole operation.
+- Operation polling is interruptible and never cancels server work implicitly.
 
 ## Install
 
-```sh
-bun add polygres-sdk-effect effect@4.0.0-rc.112
-```
-
-## Usage
-
-```ts
-import { Effect, Redacted, Stream } from "effect"
-import { FetchHttpClient } from "effect/unstable/http"
-import { Polygres, PolygresError } from "polygres-sdk-effect"
-
-const PolygresLive = Polygres.layer({
-  apiKey: Redacted.make(process.env.POLY_API_KEY!),
-  projectId: "p0123456789abcdef0123456",
-})
-
-const program = Effect.gen(function* () {
-  const polygres = yield* Polygres.Client
-  const readiness = yield* polygres.readiness()
-
-  const firstPage = yield* polygres.text.tsvector.page({
-    query: "intrusion campaign",
-    config: "evidence_body",
-    limit: 50,
-  })
-
-  const topHundred = yield* polygres.vector.search
-    .stream({
-      embedding: [0.1, 0.2],
-      config: "evidence_embeddings",
-      minSimilarity: 0.8,
-      limit: 50,
-    })
-    .pipe(Stream.take(100), Stream.runCollect)
-
-  return { readiness, firstPage, topHundred }
-}).pipe(
-  Effect.catchTag("Polygres.RateLimited", (error) =>
-    Effect.logWarning("Polygres rate limited the request", { requestId: error.requestId }),
-  ),
-  Effect.provide(PolygresLive),
-  Effect.provide(FetchHttpClient.layer),
-)
-
-await Effect.runPromise(program)
-```
-
-`Polygres.make(options)` constructs a client directly and retains `HttpClient.HttpClient` in its requirement channel. `Polygres.layer(options)` provides the yieldable `Polygres.Client` service while preserving that same transport requirement.
-
-## API Shape
-
-- Nullary Runtime methods: `polygres.readiness()` and `polygres.connectionInfo()`.
-- Object inputs: `polygres.graph.path({ source, target, maxDepth: 5 })`.
-- Row writes: `polygres.rows.upsert({ schema, table, row, conflictColumns, idempotencyKey })`.
-- Context administration: `polygres.context.createCollection({ name, source: { mode, schemaName, tableName }, vector: { dimensions }, idempotencyKey })`.
-- Context retrieval: `polygres.context.search({ collection, embedding, filter })`.
-- Durable operations: `polygres.context.waitForOperation({ operationId, timeout: "5 minutes" })`.
-- Paginated reads: `polygres.vector.search.page(input)`.
-- Cold auto-pagination: `polygres.vector.search.stream(inputWithoutCursor)` and Context cursor operations.
-- Domain schemas and types: `Context.Collection`, `ContextQuery.QueryPlan`, `Operation.Value`, `Rows.WriteResult`, and peers.
-- Narrow errors: construction returns `PolygresError.Configuration`; retrieval returns `PolygresError.Request | PolygresError.InvalidInput`.
-- CamelCase public models with Runtime wire names confined to private adapters.
-- `Option` for nullable cursors, request IDs, and ranking fields.
-
-`timeout` limits each HTTP attempt independently. Set `deadline` when the complete operation, including retries, backoff, response reading, and schema adaptation, must share one time budget. Both options accept Effect `Duration.Input` values. Row writes are never automatically retried. Context-backed row writes require a caller-provided `idempotencyKey`; uncertain outcomes fail with `PolygresError.AmbiguousWrite`.
-
-The stable surface contains readiness and passwordless connection metadata, graph/vector/text/hybrid retrieval, validated single-row insert/upsert/ignore operations, and all 96 pinned pgContext methods. The Context surface includes 83 direct HTTP methods, 12 immutable query-plan builders, stable aliases, cursor pagination, and one durable operation waiter. Pending row reconciliation can optionally be observed with `waitForContext`; a successful wait replays the same idempotent request to obtain the terminal row result.
-
-See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-## Contract Updates
+The npm release is pending. The source-complete package is currently `0.1.0`.
 
 ```sh
-bun run contracts:refresh -- check
-bun run contracts:refresh -- update --format prompt
-```
-
-The updater downloads exact canonical artifacts from one immutable official upstream commit, validates linked request/response schemas, and emits stable JSON or a task suitable for any coding agent. It never executes upstream code or rewrites the SDK automatically. See [`docs/CONTRACT_REFRESH.md`](docs/CONTRACT_REFRESH.md).
-
-## Development
-
-```sh
+git clone https://github.com/phall1/polygres-sdk-effect.git
+cd polygres-sdk-effect
 bun install
 bun run check
 ```
 
-For secret-safe, non-mutating live checks, set `POLY_API_KEY` and either `POLY_PROJECT_ID` or `POLY_RUNTIME_URL`, then run `bun run live:readiness` and `bun run live:context`.
+## Contract Proof
 
-Never commit Project API keys or PostgreSQL passwords.
+The public surface is mechanically checked against an immutable upstream SDK and OpenAPI snapshot.
+
+```sh
+bun run contracts:check
+bun run contracts:refresh -- check
+```
+
+- 102 network-facing methods verified
+- 688 canonical errors generated and checked
+- Packed declarations tested in Bun, Node.js, and a browser bundle
+- Security, retry, pagination, schema, and binding drift detected in CI
+
+See [compatibility](docs/COMPATIBILITY.md), [contract refresh](docs/CONTRACT_REFRESH.md), and the [roadmap](docs/ROADMAP.md).
+
+## Live Checks
+
+Set `POLY_API_KEY` and either `POLY_PROJECT_ID` or `POLY_RUNTIME_URL`.
+
+```sh
+bun run live:readiness
+bun run live:context
+```
+
+These probes are non-mutating and do not print credentials. Never commit Project API keys or PostgreSQL passwords.
+
+---
+
+Independent Apache-2.0 project built for the [Polygres](https://polygres.com) Runtime API.
