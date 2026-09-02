@@ -22,7 +22,7 @@ import * as TextSchema from "./Text.js"
 import type * as Vector from "./Vector.js"
 import * as VectorSchema from "./Vector.js"
 
-export const VERSION = "0.1.0"
+export const VERSION = "0.3.0"
 export const API_VERSION = "2026-08-04"
 
 const protectedHeaders = new Set([

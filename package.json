@@ -1,6 +1,6 @@
 {
   "name": "polygres-sdk-effect",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Effect-native TypeScript SDK for the Polygres Runtime API",
   "type": "module",
   "packageManager": "bun@1.4.0",
@@ -31,6 +31,7 @@
     "contracts:refresh": "bun run scripts/refresh-contract.ts",
     "catalog:generate": "bun run scripts/generate-error-catalog.ts",
     "package:check": "bun run scripts/verify-package.ts",
+    "prepack": "bun run build",
     "check": "bun run contracts:check && bun run lint && bun run format:check && bun run typecheck && bun test && bun run build && bun run package:check",
     "live:readiness": "bun run scripts/readiness.ts",
     "live:context": "bun run scripts/context-capabilities.ts"
@@ -56,6 +57,10 @@
   "engines": {
     "bun": ">=1.4.0",
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "peerDependencies": {
     "effect": ">=4.0.0-rc.112 <5"

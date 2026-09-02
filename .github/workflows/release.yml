@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to validate without publishing
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Build and verify exact package
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      tarball: ${{ steps.pack.outputs.tarball }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+      - name: Install Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install npm
+        run: npm install --global npm@12.0.2
+      - name: Validate release identity
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_TAG: ${{ github.ref_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            tag="$PUSH_TAG"
+          else
+            tag="$DISPATCH_TAG"
+          fi
+          if [[ ! "$tag" =~ ^v([0-9]+[.][0-9]+[.][0-9]+)$ ]]; then
+            echo "::error::release tags must have the form vX.Y.Z"
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "refs/tags/${tag}")"
+          test "$(node -p 'require("./package.json").version')" = "$version"
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+      - name: Install, test, and build
+        run: |
+          bun install --frozen-lockfile
+          bun run check
+      - name: Create and verify exact package
+        id: pack
+        env:
+          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          tarball="$(npm pack --json | node -e '
+            let input = "";
+            process.stdin.on("data", chunk => input += chunk);
+            process.stdin.on("end", () => {
+              const parsed = JSON.parse(input);
+              const packed = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
+              process.stdout.write(packed.filename);
+            });
+          ')"
+          mv "$tarball" "release/$tarball"
+          packed_manifest="$(tar -xOf "release/$tarball" package/package.json)"
+          test "$(node -p 'JSON.parse(process.argv[1]).name' "$packed_manifest")" = "polygres-sdk-effect"
+          test "$(node -p 'JSON.parse(process.argv[1]).version' "$packed_manifest")" = "$EXPECTED_VERSION"
+          (cd release && sha256sum "$tarball" > "${tarball}.sha256")
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+      - name: Install and execute exact package
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          tarball="$PWD/release/$TARBALL"
+          test_directory="$(mktemp -d)"
+          cd "$test_directory"
+          npm init --yes >/dev/null
+          npm install --ignore-scripts --package-lock=false "$tarball" effect@4.0.0-rc.112
+          node --input-type=module -e '
+            import { Context, ContextQuery, Operation, Polygres, Rows, Vector } from "polygres-sdk-effect";
+            if (!Polygres.Client || !Polygres.make || !Context.Collection || !ContextQuery.QueryPlan || !Operation.Value || !Rows.WriteResult || !Vector.SearchInput) process.exit(1);
+          '
+      - name: Exercise npm publish without changing the registry
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: npm publish --dry-run "release/$TARBALL"
+      - name: Upload immutable package artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: polygres-sdk-effect-${{ steps.release.outputs.tag }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-npm:
+    name: Publish npm package
+    if: ${{ github.event_name == 'push' }}
+    needs: package
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download exact validated package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: polygres-sdk-effect-${{ needs.package.outputs.tag }}
+          path: release
+      - name: Install Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+      - name: Install npm with provenance support
+        run: npm install --global npm@12.0.2
+      - name: Verify and publish package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TARBALL: ${{ needs.package.outputs.tarball }}
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum --check "${TARBALL}.sha256")
+          local_integrity="sha512-$(openssl dgst -sha512 -binary "release/$TARBALL" | openssl base64 -A)"
+          error_file="$(mktemp)"
+          set +e
+          published_integrity="$(npm view "polygres-sdk-effect@${VERSION}" dist.integrity --json 2>"$error_file")"
+          view_status=$?
+          set -e
+          if [[ $view_status -eq 0 ]]; then
+            published_integrity="$(node -e '
+              const parsed = JSON.parse(process.argv[1]);
+              const integrity = Array.isArray(parsed) ? parsed[0] : parsed;
+              if (typeof integrity !== "string") process.exit(1);
+              process.stdout.write(integrity);
+            ' "$published_integrity")"
+            test "$published_integrity" = "$local_integrity"
+          elif grep -Eq 'E404|404 Not Found' "$error_file"; then
+            npm publish --provenance --access public "release/$TARBALL"
+          else
+            cat "$error_file" >&2
+            exit "$view_status"
+          fi
+
+  github-release:
+    name: Create GitHub release
+    if: ${{ github.event_name == 'push' }}
+    needs: [package, publish-npm]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download published package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: polygres-sdk-effect-${{ needs.package.outputs.tag }}
+          path: release
+      - name: Verify package checksum
+        env:
+          TARBALL: ${{ needs.package.outputs.tarball }}
+        run: (cd release && sha256sum --check "${TARBALL}.sha256")
+      - name: Create or repair GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.package.outputs.tag }}
+          TARBALL: ${{ needs.package.outputs.tarball }}
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          error_file="$(mktemp)"
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" >/dev/null 2>"$error_file"; then
+            gh release upload "$TAG" "release/$TARBALL" "release/${TARBALL}.sha256" --clobber
+          elif grep -q 'HTTP 404' "$error_file"; then
+            gh release create "$TAG" "release/$TARBALL" "release/${TARBALL}.sha256" \
+              --verify-tag --generate-notes --title "polygres-sdk-effect ${VERSION}"
+          else
+            cat "$error_file" >&2
+            exit 1
+          fi

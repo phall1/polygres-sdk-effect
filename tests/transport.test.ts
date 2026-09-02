@@ -13,7 +13,7 @@ const config = (overrides: Partial<HttpTransport.Config> = {}): HttpTransport.Co
   maxRetries: 0,
   headers: {},
   apiVersion: "2026-08-04",
-  clientVersion: "0.1.0",
+  clientVersion: "0.3.0",
   ...overrides,
 })
 

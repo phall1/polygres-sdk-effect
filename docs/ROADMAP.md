@@ -10,7 +10,7 @@ The goal is complete, contract-verified coverage of the application-facing Polyg
 - Cursor pagination as an Effect Stream.
 - Bun, Node.js, and Cloudflare-compatible distribution.
 
-## 0.2: Safe Mutations And Context Core (implemented, unreleased)
+## 0.2: Safe Mutations And Context Core (complete)
 
 - Row validation, insert, upsert, and ignore.
 - Explicit ambiguous-write errors and zero automatic row-write retries.
@@ -18,7 +18,7 @@ The goal is complete, contract-verified coverage of the application-facing Polyg
 - Context capabilities, collection lifecycle, search/query/count/facets, and durable operation polling.
 - Stage-aware operation waiter with deadline and cancellation semantics.
 
-## 0.3: Full Runtime SDK Parity (implemented, unreleased)
+## 0.3: Full Runtime SDK Parity (complete)
 
 - Remaining application-facing Context administration and retrieval methods.
 - Local typed query-plan builders.

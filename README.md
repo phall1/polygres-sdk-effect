@@ -74,13 +74,8 @@ yield* db.rows.upsert({
 
 ## Install
 
-The npm release is pending. The source-complete package is currently `0.1.0`.
-
 ```sh
-git clone https://github.com/phall1/polygres-sdk-effect.git
-cd polygres-sdk-effect
-bun install
-bun run check
+bun add polygres-sdk-effect effect@4.0.0-rc.112
 ```
 
 ## Contract Proof

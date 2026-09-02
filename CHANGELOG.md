@@ -4,6 +4,8 @@ All notable changes will be documented here.
 
 ## Unreleased
 
+## 0.3.0 - 2026-09-02
+
 ### Added
 
 - Domain module exports for `Polygres`, `Context`, `ContextQuery`, `Entity`, `Runtime`, `Graph`, `Vector`, `Text`, `Hybrid`, `Operation`, `Page`, `Rows`, and `PolygresError`.
