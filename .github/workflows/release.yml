@@ -198,10 +198,11 @@ jobs:
           set -euo pipefail
           error_file="$(mktemp)"
           if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" >/dev/null 2>"$error_file"; then
-            gh release upload "$TAG" "release/$TARBALL" "release/${TARBALL}.sha256" --clobber
+            gh release upload "$TAG" "release/$TARBALL" "release/${TARBALL}.sha256" \
+              --repo "$GITHUB_REPOSITORY" --clobber
           elif grep -q 'HTTP 404' "$error_file"; then
             gh release create "$TAG" "release/$TARBALL" "release/${TARBALL}.sha256" \
-              --verify-tag --generate-notes --title "polygres-sdk-effect ${VERSION}"
+              --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "polygres-sdk-effect ${VERSION}"
           else
             cat "$error_file" >&2
             exit 1
