@@ -5,10 +5,16 @@ import type * as Graph from "./Graph.js"
 import * as GraphSchema from "./Graph.js"
 import type * as Hybrid from "./Hybrid.js"
 import * as HybridSchema from "./Hybrid.js"
+import * as ContextClient from "./internal/ContextClient.js"
 import * as HttpTransport from "./internal/HttpTransport.js"
+import * as OperationWait from "./internal/OperationWait.js"
+import * as RowsWire from "./internal/RowsWire.js"
 import * as Wire from "./internal/Wire.js"
+import * as Operation from "./Operation.js"
 import * as Page from "./Page.js"
 import * as PolygresError from "./PolygresError.js"
+import type * as Rows from "./Rows.js"
+import * as RowsSchema from "./Rows.js"
 import type * as Runtime from "./Runtime.js"
 import * as RuntimeSchema from "./Runtime.js"
 import type * as Text from "./Text.js"
@@ -19,7 +25,15 @@ import * as VectorSchema from "./Vector.js"
 export const VERSION = "0.1.0"
 export const API_VERSION = "2026-08-04"
 
-const protectedHeaders = new Set(["authorization", "user-agent", "x-polygres-api-version", "x-polygres-client-info"])
+const protectedHeaders = new Set([
+  "accept",
+  "authorization",
+  "content-type",
+  "idempotency-key",
+  "user-agent",
+  "x-polygres-api-version",
+  "x-polygres-client-info",
+])
 
 export interface Options {
   readonly apiKey: Redacted.Redacted<string> | string
@@ -56,6 +70,15 @@ export interface HybridService {
   readonly joint: Page.Operation<Hybrid.JointInput, Hybrid.Result>
 }
 
+export interface RowsService {
+  readonly validate: (input: Rows.ValidateInput) => Effect.Effect<Rows.WriteValidation, PolygresError.Search>
+  readonly insert: (input: Rows.InsertInput) => Effect.Effect<Rows.WriteResult, PolygresError.Write>
+  readonly upsert: (input: Rows.UpsertInput) => Effect.Effect<Rows.WriteResult, PolygresError.Write>
+  readonly ignore: (input: Rows.IgnoreInput) => Effect.Effect<Rows.WriteResult, PolygresError.Write>
+}
+
+export type ContextService = ContextClient.ContextService
+
 export interface Service {
   readonly readiness: () => Effect.Effect<Runtime.Readiness, PolygresError.Request>
   readonly connectionInfo: () => Effect.Effect<Runtime.ConnectionInfo, PolygresError.Request>
@@ -63,6 +86,8 @@ export interface Service {
   readonly vector: VectorService
   readonly text: TextService
   readonly hybrid: HybridService
+  readonly rows: RowsService
+  readonly context: ContextService
 }
 
 export class Client extends Context.Service<Client, Service>()("polygres-sdk-effect/Polygres") {}
@@ -163,6 +188,169 @@ const validateVectorThresholds = <A extends { readonly maxDistance?: number; rea
       )
     : Effect.succeed(input)
 
+const invalidRowInput = (operation: string, path: ReadonlyArray<string>, message: string) =>
+  Effect.fail(
+    new PolygresError.InvalidInput({
+      operation,
+      message: `Invalid input for ${operation}.`,
+      issues: [{ path: [...path], message }],
+    }),
+  )
+
+const validateRowMode = (operation: string, input: Rows.ValidateInput) => {
+  const mode = input.mode ?? "insert"
+  if (mode === "insert" && ((input.conflictColumns?.length ?? 0) > 0 || input.updateColumns !== undefined)) {
+    return invalidRowInput(operation, ["mode"], "insert does not accept conflict or update columns")
+  }
+  if ((mode === "upsert" || mode === "ignore") && (input.conflictColumns?.length ?? 0) === 0) {
+    return invalidRowInput(operation, ["conflictColumns"], `${mode} requires conflictColumns`)
+  }
+  if (mode === "ignore" && input.updateColumns !== undefined) {
+    return invalidRowInput(operation, ["updateColumns"], "ignore does not accept updateColumns")
+  }
+  return Effect.succeed({ ...input, mode })
+}
+
+type RowWriteInput = Rows.InsertInput | Rows.UpsertInput | Rows.IgnoreInput
+const isContextRequested = (input: Rows.ValidateInput | RowWriteInput) =>
+  input.reconcileContext === true || input.contextCollectionId !== undefined
+
+const validateRowWrite = <A extends RowWriteInput>(operation: string, input: A) => {
+  const contextRequested = isContextRequested(input)
+  if (contextRequested && input.idempotencyKey === undefined) {
+    return invalidRowInput(operation, ["idempotencyKey"], "Context-backed row writes require idempotencyKey")
+  }
+  if (!contextRequested && input.idempotencyKey !== undefined) {
+    return invalidRowInput(operation, ["idempotencyKey"], "idempotencyKey requires Context reconciliation")
+  }
+  if (
+    input.waitForContext === true &&
+    (input.waitTimeout === undefined || input.waitTimeout > 0) &&
+    Number.isFinite(input.waitTimeout ?? 300)
+  ) {
+    return Effect.succeed(input)
+  }
+  if (input.waitForContext !== true) return Effect.succeed(input)
+  return invalidRowInput(operation, ["waitTimeout"], "waitTimeout must be a positive finite number")
+}
+
+const rowBody = (input: Rows.ValidateInput | RowWriteInput, mode: Rows.Mode) => {
+  const contextRequested = isContextRequested(input)
+  return {
+    mode,
+    row: input.row,
+    returning: input.returning ?? [],
+    ...(!("conflictColumns" in input) || input.conflictColumns === undefined
+      ? {}
+      : { conflict_columns: input.conflictColumns }),
+    ...(!("updateColumns" in input) || input.updateColumns === undefined
+      ? {}
+      : { update_columns: input.updateColumns }),
+    ...(contextRequested
+      ? {
+          context: {
+            reconcile: true,
+            ...(input.contextCollectionId === undefined ? {} : { collection_id: input.contextCollectionId }),
+          },
+        }
+      : {}),
+  }
+}
+
+const rowPath = (input: { readonly schema: string; readonly table: string }, validate = false) =>
+  `/tables/${encodeURIComponent(input.schema)}/${encodeURIComponent(input.table)}/rows${validate ? "/validate" : ""}`
+
+const errorCode = (error: PolygresError.Request): string | undefined =>
+  "code" in error && typeof error.code === "string" ? error.code : undefined
+
+const errorStatus = (error: PolygresError.Request): number | undefined =>
+  "status" in error && typeof error.status === "number" ? error.status : undefined
+
+const ambiguousWrite = (
+  operation: string,
+  error: PolygresError.Request,
+): PolygresError.Request | PolygresError.AmbiguousWrite => {
+  if (error instanceof PolygresError.AmbiguousWrite) return error
+  const code = errorCode(error)
+  if (code !== "ROW_WRITE_OUTCOME_AMBIGUOUS" && code !== undefined && PolygresError.isCatalogCode(code)) return error
+  const status = errorStatus(error)
+  if (
+    !(error instanceof PolygresError.Transport) &&
+    !(error instanceof PolygresError.RequestTimeout) &&
+    ![408, 500, 502, 503, 504].includes(status ?? -1)
+  ) {
+    return error
+  }
+  return new PolygresError.AmbiguousWrite({
+    operation,
+    message: PolygresError.redact(error.message),
+    ...(status === undefined ? {} : { status }),
+    code: code ?? "ROW_WRITE_OUTCOME_AMBIGUOUS",
+    ...(error instanceof PolygresError.InvalidResponse || !("requestId" in error) || error.requestId === undefined
+      ? {}
+      : { requestId: error.requestId }),
+    ...("retryAfterMillis" in error && error.retryAfterMillis !== undefined
+      ? { retryAfterMillis: error.retryAfterMillis }
+      : {}),
+    details: "details" in error ? error.details : {},
+  })
+}
+
+const expectedRowOperation = (mode: Rows.Mode): Rows.WriteResult["operation"] =>
+  mode === "insert" ? "inserted" : mode === "upsert" ? "upserted" : "ignored"
+
+const validateRowResponseIdentity = (
+  operation: string,
+  input: RowWriteInput,
+  mode: Rows.Mode,
+  result: Rows.WriteResult,
+  expectedContextOperationId?: string,
+): Effect.Effect<Rows.WriteResult, PolygresError.InvalidResponse> => {
+  const context = Option.getOrUndefined(result.context)
+  const echoedKey = Option.getOrUndefined(result.idempotencyKey)
+  const mismatch =
+    result.schema !== input.schema ||
+    result.table !== input.table ||
+    result.operation !== expectedRowOperation(mode) ||
+    (echoedKey !== undefined && echoedKey !== input.idempotencyKey) ||
+    isContextRequested(input) !== (context !== undefined) ||
+    (input.contextCollectionId !== undefined && context?.collectionId !== input.contextCollectionId) ||
+    (expectedContextOperationId !== undefined &&
+      !Option.contains(context?.operationId ?? Option.none(), expectedContextOperationId))
+  return mismatch
+    ? Effect.fail(
+        new PolygresError.InvalidResponse({
+          operation,
+          message: "Row write response identity did not match the request.",
+          status: 200,
+        }),
+      )
+    : Effect.succeed(result)
+}
+
+const validateRowValidationIdentity = (
+  operation: string,
+  input: Rows.ValidateInput,
+  result: Rows.WriteValidation,
+): Effect.Effect<Rows.WriteValidation, PolygresError.InvalidResponse> => {
+  const context = Option.getOrUndefined(result.context)
+  const mismatch =
+    result.schema !== input.schema ||
+    result.table !== input.table ||
+    result.operation !== (input.mode ?? "insert") ||
+    isContextRequested(input) !== (context !== undefined) ||
+    (input.contextCollectionId !== undefined && context?.collectionId !== input.contextCollectionId)
+  return mismatch
+    ? Effect.fail(
+        new PolygresError.InvalidResponse({
+          operation,
+          message: "Row validation response identity did not match the request.",
+          status: 200,
+        }),
+      )
+    : Effect.succeed(result)
+}
+
 const validateConfig = (options: Options) =>
   Effect.gen(function* () {
     const key = typeof options.apiKey === "string" ? options.apiKey : Redacted.value(options.apiKey)
@@ -256,6 +444,10 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
   Effect.gen(function* () {
     const config = yield* validateConfig(options)
     const transport = yield* HttpTransport.make(config)
+    const context = ContextClient.make(
+      transport,
+      Option.match(config.deadline, { onNone: () => ({}), onSome: (deadline) => ({ deadline }) }),
+    )
 
     const withDeadline = <A, E>(operation: string, effect: Effect.Effect<A, E>) =>
       Option.match(config.deadline, {
@@ -270,6 +462,7 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
                     operation,
                     kind: "deadline",
                     message: `Polygres exceeded the operation deadline for ${operation}.`,
+                    details: {},
                   }),
                 ),
             }),
@@ -291,7 +484,7 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
             operation,
             method: body === undefined ? "GET" : "POST",
             path,
-            retry: "read",
+            retry: "readOnly",
             ...(body === undefined ? {} : { body }),
           })
           .pipe(
@@ -312,9 +505,212 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
       withDeadline(
         operation,
         transport
-          .request({ operation, method: "POST", path, body, retry: "read" })
+          .request({ operation, method: "POST", path, body, retry: "readOnly" })
           .pipe(Effect.flatMap((payload) => Wire.decodePage(operation, wire, domain, map, payload))),
       )
+
+    const rowOperationWaiter = (expectedCollectionId: string) =>
+      OperationWait.make<PolygresError.Request, never>((operationId, remaining) =>
+        transport
+          .requestWithMetadata({
+            operation: "context.waitForOperation",
+            method: "GET",
+            path: `/context/operations/${encodeURIComponent(operationId)}`,
+            retry: "readOnly",
+            expectedStatuses: [200],
+            timeout: remaining,
+            budget: remaining,
+          })
+          .pipe(
+            Effect.flatMap((response) =>
+              Wire.decode("context.waitForOperation", RowsWire.ContextOperationEnvelope, response.payload).pipe(
+                Effect.flatMap((envelope) =>
+                  Wire.validate(
+                    "context.waitForOperation",
+                    Operation.Value,
+                    RowsWire.contextOperation(envelope),
+                    response.payload,
+                  ).pipe(
+                    Effect.flatMap((operation) => {
+                      if (
+                        operation.id !== operationId ||
+                        operation.kind !== "points_upsert" ||
+                        !Option.contains(operation.collectionId, expectedCollectionId)
+                      ) {
+                        return Effect.fail(
+                          new PolygresError.InvalidResponse({
+                            operation: "context.waitForOperation",
+                            message: "Context operation identity did not match the pending row reconciliation.",
+                            status: response.status,
+                            requestId: PolygresError.redact(envelope.request_id),
+                          }),
+                        )
+                      }
+                      return Effect.succeed({
+                        operation,
+                        _tag: "PollResult" as const,
+                        ...(response.retryAfterMillis === undefined
+                          ? {}
+                          : { retryAfterMillis: response.retryAfterMillis }),
+                      })
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      )
+
+    const decodeRowResult = (
+      operation: string,
+      input: RowWriteInput,
+      mode: Rows.Mode,
+      payload: unknown,
+      expectedContextOperationId?: string,
+    ) =>
+      Wire.decode(operation, RowsWire.WriteResult, payload).pipe(
+        Effect.map(RowsWire.writeResult),
+        Effect.flatMap((value) => Wire.validate(operation, RowsSchema.WriteResult, value, payload)),
+        Effect.flatMap((value) =>
+          validateRowResponseIdentity(operation, input, mode, value, expectedContextOperationId),
+        ),
+      )
+
+    const sendRowOnce = (
+      operation: string,
+      input: RowWriteInput,
+      mode: Rows.Mode,
+      expectedContextOperationId?: string,
+    ) =>
+      transport
+        .request({
+          operation,
+          method: "POST",
+          path: rowPath(input),
+          body: rowBody(input, mode),
+          retry: "never",
+          expectedStatuses: [200, 202],
+          ...(input.idempotencyKey === undefined ? {} : { headers: { "Idempotency-Key": input.idempotencyKey } }),
+        })
+        .pipe(Effect.flatMap((payload) => decodeRowResult(operation, input, mode, payload, expectedContextOperationId)))
+
+    const writeInitialRowOnce = (operation: string, input: RowWriteInput, mode: Rows.Mode) =>
+      sendRowOnce(operation, input, mode).pipe(Effect.catch((error) => Effect.fail(ambiguousWrite(operation, error))))
+
+    const finishRowWrite = (
+      operation: string,
+      input: RowWriteInput,
+      mode: Rows.Mode,
+      result: Rows.WriteResult,
+    ): Effect.Effect<Rows.WriteResult, PolygresError.Write> => {
+      if (input.waitForContext !== true || result.status !== "pending" || Option.isNone(result.context)) {
+        return Effect.succeed(result)
+      }
+      const context = Option.getOrUndefined(result.context)
+      if (context === undefined) return Effect.succeed(result)
+      const operationId = Option.getOrUndefined(context.operationId)
+      if (operationId === undefined) {
+        return Effect.fail(
+          new PolygresError.InvalidResponse({
+            operation,
+            message: "Pending Context reconciliation did not include an operation ID.",
+            status: 200,
+            requestId: result.requestId,
+          }),
+        )
+      }
+      const onWaitFailure = (
+        error: PolygresError.Request | Operation.WaitError,
+      ): Effect.Effect<Rows.WriteResult, PolygresError.Search> => {
+        if (error instanceof Operation.TimedOut) return Effect.succeed(result)
+        if (error instanceof Operation.InvalidWaitTimeout) {
+          return invalidRowInput(operation, ["waitTimeout"], error.message)
+        }
+        const code = errorCode(error)
+        if (code === "TIMEOUT" || (error instanceof PolygresError.RequestTimeout && error.kind === "deadline")) {
+          return Effect.succeed(result)
+        }
+        const details = "details" in error ? error.details : {}
+        const operationStatus = details.operation_status
+        if (operationStatus !== "failed" && operationStatus !== "cancelled") {
+          return Effect.fail(
+            PolygresError.addDetails(error, {
+              operation_id: operationId,
+              idempotency_key: input.idempotencyKey,
+              row_request_id: result.requestId,
+            }),
+          )
+        }
+        return Effect.succeed({
+          ...result,
+          status: "partial_failed",
+          context: Option.some({
+            ...context,
+            status: "partial_failed",
+            operationStatus: Option.some(operationStatus),
+            error: Option.some({
+              code: "ROW_CONTEXT_RECONCILIATION_FAILED",
+              message: "The row committed, but Context reconciliation failed.",
+              retryable: PolygresError.isRetryableContextError(code ?? "CONTEXT_OPERATION_FAILED"),
+              details: {
+                operation_id: operationId,
+                underlying_code: code ?? "CONTEXT_OPERATION_FAILED",
+              },
+            }),
+          }),
+        })
+      }
+      const recovery = {
+        operation_id: operationId,
+        idempotency_key: input.idempotencyKey,
+        row_request_id: result.requestId,
+      }
+      return rowOperationWaiter(context.collectionId)(operationId, {
+        timeout: Duration.seconds(input.waitTimeout ?? 300),
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: onWaitFailure,
+          onSuccess: () =>
+            sendRowOnce(operation, input, mode, operationId).pipe(
+              Effect.mapError((error) => PolygresError.addDetails(error, recovery)),
+            ),
+        }),
+      )
+    }
+
+    const writeRow = <A extends RowWriteInput>(operation: string, schema: InputSchema<A>, mode: Rows.Mode, input: A) =>
+      Effect.suspend(() => {
+        let acknowledged: Rows.WriteResult | undefined
+        return withDeadline(
+          operation,
+          parseInput(operation, schema, input).pipe(
+            Effect.flatMap((parsed) => validateRowWrite(operation, parsed)),
+            Effect.flatMap((parsed) =>
+              writeInitialRowOnce(operation, parsed, mode).pipe(
+                Effect.map((result) => {
+                  acknowledged = result
+                  return result
+                }),
+                Effect.flatMap((result) => finishRowWrite(operation, parsed, mode, result)),
+              ),
+            ),
+          ),
+        ).pipe(
+          Effect.catch((error): Effect.Effect<never, PolygresError.Write> => {
+            if (!(error instanceof PolygresError.RequestTimeout)) return Effect.fail(error)
+            if (acknowledged === undefined) return Effect.fail(ambiguousWrite(operation, error))
+            const context = Option.getOrUndefined(acknowledged.context)
+            const operationId = context === undefined ? undefined : Option.getOrUndefined(context.operationId)
+            return Effect.fail(
+              PolygresError.addDetails(error, {
+                ...(operationId === undefined ? {} : { operation_id: operationId }),
+                idempotency_key: input.idempotencyKey,
+                row_request_id: acknowledged.requestId,
+              }),
+            )
+          }),
+        )
+      })
 
     const graphPage = <Input extends Graph.ExpandInput | Graph.NeighborhoodInput | Graph.RelatedInput>(
       operation: string,
@@ -424,7 +820,8 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
             operation: "connectionInfo",
             method: "GET",
             path: "/connection-info",
-            retry: "read",
+            retry: "readOnly",
+            expectedStatuses: [200],
           })
           const value = yield* Wire.decode("connectionInfo", Wire.ConnectionInfo, payload)
           if (value.project_mode === "synced" || value.project?.project_mode === "synced") {
@@ -447,6 +844,47 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
     return Client.of({
       readiness,
       connectionInfo,
+      context,
+      rows: {
+        validate: Effect.fn("Polygres.rows.validate")((input: Rows.ValidateInput) =>
+          parseInput("rows.validate", RowsSchema.ValidateInput, input).pipe(
+            Effect.flatMap((parsed) => validateRowMode("rows.validate", parsed)),
+            Effect.flatMap((parsed) =>
+              withDeadline(
+                "rows.validate",
+                transport
+                  .request({
+                    operation: "rows.validate",
+                    method: "POST",
+                    path: rowPath(parsed, true),
+                    body: rowBody(parsed, parsed.mode),
+                    retry: "readOnly",
+                  })
+                  .pipe(
+                    Effect.flatMap((payload) =>
+                      Wire.decode("rows.validate", RowsWire.WriteValidation, payload).pipe(
+                        Effect.map(RowsWire.writeValidation),
+                        Effect.flatMap((value) =>
+                          Wire.validate("rows.validate", RowsSchema.WriteValidation, value, payload),
+                        ),
+                        Effect.flatMap((value) => validateRowValidationIdentity("rows.validate", parsed, value)),
+                      ),
+                    ),
+                  ),
+              ),
+            ),
+          ),
+        ),
+        insert: Effect.fn("Polygres.rows.insert")((input: Rows.InsertInput) =>
+          writeRow("rows.insert", RowsSchema.InsertInput, "insert", input),
+        ),
+        upsert: Effect.fn("Polygres.rows.upsert")((input: Rows.UpsertInput) =>
+          writeRow("rows.upsert", RowsSchema.UpsertInput, "upsert", input),
+        ),
+        ignore: Effect.fn("Polygres.rows.ignore")((input: Rows.IgnoreInput) =>
+          writeRow("rows.ignore", RowsSchema.IgnoreInput, "ignore", input),
+        ),
+      },
       graph: {
         expand: graphPage("graph.expand", "/graph/expand", GraphSchema.ExpandInput, {
           maxDepth: 5,
@@ -473,7 +911,7 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
                     operation: "graph.path",
                     method: "POST",
                     path: "/graph/path",
-                    retry: "read",
+                    retry: "readOnly",
                     body: {
                       source: parsed.source,
                       target: parsed.target,
@@ -504,7 +942,7 @@ export const make = (options: Options): Effect.Effect<Service, PolygresError.Con
                     operation: "graph.connection",
                     method: "POST",
                     path: "/graph/connection",
-                    retry: "read",
+                    retry: "readOnly",
                     body: {
                       entities: parsed.entities,
                       ...traversalBody(parsed, { maxDepth: 5, direction: "any" }),

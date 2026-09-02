@@ -1,7 +1,17 @@
 import type { Effect, Layer, Stream } from "effect"
 import type { HttpClient } from "effect/unstable/http"
 
-import { type Graph, Polygres, type PolygresError, type Runtime, type Vector } from "../src/index.js"
+import {
+  type Context,
+  type ContextQuery,
+  type Graph,
+  type Operation,
+  Polygres,
+  type PolygresError,
+  type Rows,
+  type Runtime,
+  type Vector,
+} from "../src/index.js"
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false
@@ -27,6 +37,20 @@ const graphPath = client.graph.path({
   source: { schema: "public", table: "entities", id: "a" },
   target: { schema: "public", table: "entities", id: "b" },
 })
+const rowWrite = client.rows.upsert({
+  schema: "public",
+  table: "events",
+  row: { id: "one" },
+  conflictColumns: ["id"],
+})
+const contextCapabilities = client.context.getCapabilities({})
+const contextOperation = client.context.getOperation({ operationId: "00000000-0000-0000-0000-000000000002" })
+const recommendPoints = client.context.recommend({ collection: "events", positivePointIds: [1] })
+const recommendVectors = client.context.recommend({ collection: "events", positiveVectors: [[0.1, 0.2]] })
+const nearestPlan = client.context.queryNearest({
+  vector: [0.1, 0.2],
+  filter: { future_operator: { value: true } },
+})
 const constructed = Polygres.make({
   apiKey: "poly_live_0123456789abcdef0123456789abcdef",
   projectId: "p0123456789abcdef0123456",
@@ -47,6 +71,20 @@ export type ComputedEmbeddingInference = Assert<
   Equal<EffectSuccess<typeof computedVectorPage>, EffectSuccess<typeof vectorPage>>
 >
 export type GraphPathInference = Assert<Equal<EffectSuccess<typeof graphPath>, Graph.PathResponse>>
+export type RowWriteInference = Assert<Equal<EffectSuccess<typeof rowWrite>, Rows.WriteResult>>
+export type RowWriteErrorIsNarrow = Assert<Equal<EffectError<typeof rowWrite>, PolygresError.Write>>
+export type RowRequestIdIsRequired = Assert<Equal<Rows.WriteResult["requestId"], string>>
+export type ContextIsPublic = Assert<
+  EffectSuccess<typeof contextCapabilities> extends Context.CapabilitiesResponse ? true : false
+>
+export type ContextOperationInference = Assert<Equal<EffectSuccess<typeof contextOperation>, Operation.Value>>
+export type PointRecommendIsAccepted = Assert<
+  EffectSuccess<typeof recommendPoints> extends Context.ScoredResponse ? true : false
+>
+export type VectorRecommendIsAccepted = Assert<
+  EffectSuccess<typeof recommendVectors> extends Context.ScoredResponse ? true : false
+>
+export type OpaquePlanFilterIsAccepted = Assert<Equal<typeof nearestPlan, ContextQuery.NearestPlan>>
 export type ConstructionFailure = Assert<Equal<EffectError<typeof constructed>, PolygresError.Configuration>>
 export type ConstructionRequirement = Assert<Equal<EffectRequirements<typeof constructed>, HttpClient.HttpClient>>
 export type LayerRequirement = Assert<Equal<LayerRequirements<typeof live>, HttpClient.HttpClient>>
@@ -65,3 +103,12 @@ client.graph.expand.page({ start: [{ schema: "public", table: "entities", id: "a
 
 // @ts-expect-error Public Runtime models do not leak wire casing.
 declare const leakedWireName: Runtime.Readiness["project_id"]
+
+// @ts-expect-error Row methods accept one schema-owned object input.
+client.rows.insert("public", "events", { id: "one" })
+
+// @ts-expect-error Insert does not accept conflict columns.
+client.rows.insert({ schema: "public", table: "events", row: { id: "one" }, conflictColumns: ["id"] })
+
+// @ts-expect-error Public row models do not leak wire casing.
+declare const leakedRowWireName: Rows.WriteResult["row_committed"]

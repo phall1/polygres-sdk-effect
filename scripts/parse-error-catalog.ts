@@ -3,9 +3,26 @@ export type CatalogDescriptor = readonly [
   message: string,
   safeDetails: ReadonlyArray<string>,
   variants: Readonly<Record<string, readonly [message: string, status: number]>>,
+  retryClass: RetryClass,
 ]
 
 export type ErrorCatalog = Readonly<Record<string, CatalogDescriptor>>
+export type RetryClass =
+  | "after_delay"
+  | "after_user_action"
+  | "bounded_retry"
+  | "dependency_retry"
+  | "never"
+  | "user_retry"
+
+const retryClasses = new Set<RetryClass>([
+  "after_delay",
+  "after_user_action",
+  "bounded_retry",
+  "dependency_retry",
+  "never",
+  "user_retry",
+])
 
 class PythonLiteralParser {
   private index = 0
@@ -169,6 +186,7 @@ export const parsePythonErrorCatalog = (source: string): ErrorCatalog => {
     const status = row.http_status
     const message = row.message
     const safe = row.safe_detail_fields
+    const retryClass = row.retry_class
     const rawVariants = object(row.variants, `variants for ${String(code)}`)
     if (typeof code !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(code) || Object.hasOwn(catalog, code)) {
       throw new Error(`Invalid or duplicate error code at descriptor ${index}`)
@@ -177,7 +195,9 @@ export const parsePythonErrorCatalog = (source: string): ErrorCatalog => {
       !Number.isInteger(status) ||
       typeof message !== "string" ||
       !Array.isArray(safe) ||
-      !safe.every((v) => typeof v === "string")
+      !safe.every((v) => typeof v === "string") ||
+      typeof retryClass !== "string" ||
+      !retryClasses.has(retryClass as RetryClass)
     ) {
       throw new Error(`Invalid canonical error descriptor for ${code}`)
     }
@@ -194,7 +214,7 @@ export const parsePythonErrorCatalog = (source: string): ErrorCatalog => {
         writable: true,
       })
     }
-    catalog[code] = [status as number, message, safe as ReadonlyArray<string>, variants]
+    catalog[code] = [status as number, message, safe as ReadonlyArray<string>, variants, retryClass as RetryClass]
   }
   return catalog
 }

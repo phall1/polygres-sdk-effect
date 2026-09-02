@@ -35,6 +35,37 @@ const surface = validateSurface({
   ],
 })
 
+test("surface validation permits exact shared bindings and rejects conflicting ones", () => {
+  const base = {
+    api_family: "v1",
+    default_api_version: "2026-08-04",
+    upstream_sdk_version: "0.4.1",
+  }
+  const shared = {
+    operation_id: "runtime_write_row",
+    method: "POST",
+    path: "/v1/tables/{schema_name}/{table_name}/rows",
+  }
+  expect(
+    validateSurface({
+      ...base,
+      methods: [
+        { public_name: "rows.insert", ...shared },
+        { public_name: "rows.upsert", ...shared },
+      ],
+    }).methods,
+  ).toHaveLength(2)
+  expect(() =>
+    validateSurface({
+      ...base,
+      methods: [
+        { public_name: "rows.insert", ...shared },
+        { public_name: "rows.upsert", ...shared, method: "PUT" },
+      ],
+    }),
+  ).toThrow("Conflicting Effect operation binding")
+})
+
 const bundle = (
   options: {
     readonly changed?: boolean
@@ -52,6 +83,8 @@ const bundle = (
     readonly description?: string
     readonly renamed?: boolean
     readonly errorStatus?: number
+    readonly security?: boolean
+    readonly securityScheme?: boolean
   } = {},
 ) => {
   const paths: Record<string, Record<string, unknown>> = {
@@ -68,12 +101,19 @@ const bundle = (
     },
     "/v1/retrieval/readiness": { get: { operationId: "runtime_retrieval_readiness" } },
   }
+  if (options.security) {
+    const operation = paths["/v1/vector/search"]?.post as Record<string, unknown>
+    operation.security = []
+  }
   if (options.added) paths["/v1/context/new-search"] = { post: { operationId: "runtime_context_new_search" } }
   const openapiBytes = encoder.encode(
     JSON.stringify({
       openapi: "3.1.0",
       paths,
       components: {
+        securitySchemes: {
+          ContextBearerAuth: { type: "http", scheme: options.securityScheme ? "basic" : "bearer" },
+        },
         schemas: {
           SearchRequest: {
             type: "object",
@@ -155,6 +195,7 @@ const bundle = (
     'http_status': ${options.errorStatus ?? 500},
     'message': 'First ' 'message.',
     'safe_detail_fields': ['field'],
+    'retry_class': 'never',
     'variants': {'specific': {'message': 'Variant.', 'http_status': 409}}
   }])\n`)
   return validateBundle({
@@ -251,6 +292,20 @@ test("contract analysis follows response schema component references", () => {
   const changes = analyzeContracts(bundle(), bundle({ responseSchema: "number" }), surface)
 
   expect(changes.operationsChanged).toEqual(["runtime_vector_search"])
+  expect(changes.implementedAffected).toEqual(["vector.search"])
+})
+
+test("contract analysis treats security changes as implementation-affecting drift", () => {
+  const changes = analyzeContracts(bundle(), bundle({ security: true }), surface)
+
+  expect(changes.operationsChanged).toEqual(["runtime_vector_search"])
+  expect(changes.implementedAffected).toEqual(["vector.search"])
+})
+
+test("contract analysis follows security scheme definitions", () => {
+  const changes = analyzeContracts(bundle(), bundle({ securityScheme: true }), surface)
+
+  expect(changes.operationsChanged).toEqual(["runtime_retrieval_readiness", "runtime_vector_search"])
   expect(changes.implementedAffected).toEqual(["vector.search"])
 })
 

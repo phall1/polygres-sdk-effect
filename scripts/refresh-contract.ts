@@ -204,7 +204,7 @@ export const validateSurface = (value: unknown): Surface => {
   parseSemver(value.upstream_sdk_version)
   if (!Array.isArray(value.methods)) throw new Error("Invalid Effect surface methods")
   const publicNames = new Set<string>()
-  const operationIds = new Set<string>()
+  const operationIds = new Map<string, { readonly method: string; readonly path: string }>()
   const methods = value.methods.map((candidate) => {
     if (!isObject(candidate)) throw new Error("Invalid Effect surface method")
     const { public_name, operation_id, method, path } = candidate
@@ -222,9 +222,12 @@ export const validateSurface = (value: unknown): Surface => {
       throw new Error("Invalid Effect surface method")
     }
     if (publicNames.has(public_name)) throw new Error(`Duplicate Effect method: ${public_name}`)
-    if (operationIds.has(operation_id)) throw new Error(`Duplicate Effect operation: ${operation_id}`)
+    const existing = operationIds.get(operation_id)
+    if (existing !== undefined && (existing.method !== method || existing.path !== path)) {
+      throw new Error(`Conflicting Effect operation binding: ${operation_id}`)
+    }
     publicNames.add(public_name)
-    operationIds.add(operation_id)
+    operationIds.set(operation_id, { method, path })
     return { public_name, operation_id, method, path }
   })
   return {
@@ -291,10 +294,13 @@ const jsonPointer = (root: OpenApi, reference: string): Json => {
 }
 
 const operationContract = (openapi: OpenApi, pathItem: JsonObject, operation: JsonObject): Json => {
+  const components = isObject(openapi.components) ? openapi.components : {}
   const contract: Json = {
     parameters: [pathItem.parameters ?? null, operation.parameters ?? null],
     requestBody: operation.requestBody ?? null,
     responses: operation.responses ?? null,
+    security: operation.security ?? pathItem.security ?? openapi.security ?? null,
+    securitySchemes: components.securitySchemes ?? null,
   }
   const references: Record<string, Json> = {}
   const visit = (value: Json): void => {

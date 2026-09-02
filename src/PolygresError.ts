@@ -22,6 +22,8 @@ export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Polygres.I
   operation: Schema.String,
   message: Schema.String,
   issues: Schema.Array(Schema.Struct({ path: Schema.Array(Schema.String), message: Schema.String })),
+  code: Schema.optionalKey(Schema.String),
+  details: Schema.optionalKey(JsonObject),
 }) {}
 
 export class Transport extends Schema.TaggedError<Transport>()("Polygres.Transport", {
@@ -29,12 +31,14 @@ export class Transport extends Schema.TaggedError<Transport>()("Polygres.Transpo
   reason: Schema.Literals(["request", "response"]),
   message: Schema.String,
   diagnostic: Schema.optionalKey(Schema.String),
+  details: JsonObject,
 }) {}
 
 export class RequestTimeout extends Schema.TaggedError<RequestTimeout>()("Polygres.RequestTimeout", {
   operation: Schema.String,
   kind: Schema.Literals(["attempt", "deadline"]),
   message: Schema.String,
+  details: JsonObject,
 }) {}
 
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()("Polygres.InvalidResponse", {
@@ -55,6 +59,15 @@ export class Maintenance extends Schema.TaggedError<Maintenance>()("Polygres.Mai
 export class Server extends Schema.TaggedError<Server>()("Polygres.Server", apiFields) {}
 export class Api extends Schema.TaggedError<Api>()("Polygres.Api", apiFields) {}
 export class Validation extends Schema.TaggedError<Validation>()("Polygres.Validation", apiFields) {}
+export class AmbiguousWrite extends Schema.TaggedError<AmbiguousWrite>()("Polygres.AmbiguousWrite", {
+  operation: Schema.String,
+  message: Schema.String,
+  status: Schema.optionalKey(Schema.Int),
+  code: Schema.String,
+  requestId: Schema.optionalKey(Schema.String),
+  retryAfterMillis: Schema.optionalKey(Schema.Finite),
+  details: JsonObject,
+}) {}
 
 export type Request =
   | Transport
@@ -70,10 +83,30 @@ export type Request =
   | Validation
 
 export type Search = Request | InvalidInput
+export type Write = Request | InvalidInput | AmbiguousWrite
 
 const secretPattern = /poly_live_[0-9a-f]{32}/gi
 
 export const redact = (value: string): string => value.replace(secretPattern, "[REDACTED]")
+
+export const isCatalogCode = (code: string): boolean => Object.hasOwn(catalog, code)
+
+export const isRetryableContextError = (code: string): boolean => {
+  const retryClass = catalog[code]?.[4]
+  return retryClass === "after_delay" || retryClass === "bounded_retry" || retryClass === "user_retry"
+}
+
+export const addDetails = <E extends Request>(error: E, additions: Readonly<Record<string, unknown>>): E => {
+  const current = "details" in error && typeof error.details === "object" ? error.details : {}
+  const clone = Object.create(Object.getPrototypeOf(error), Object.getOwnPropertyDescriptors(error)) as E
+  Object.defineProperty(clone, "details", {
+    value: sanitizeRecord({ ...current, ...additions }),
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  })
+  return clone
+}
 
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1({
   leafHook: (issue) => issue._tag,
@@ -98,6 +131,8 @@ const sanitize = (value: unknown): Schema.Schema.Type<typeof Schema.Json> => {
 const sanitizeRecord = (value: Readonly<Record<string, unknown>>) =>
   Object.fromEntries(Object.entries(value).map(([key, item]) => [redact(key), sanitize(item)]))
 
+export const sanitizeDetails = sanitizeRecord
+
 export const fromApi = (input: {
   readonly operation: string
   readonly status: number
@@ -107,6 +142,7 @@ export const fromApi = (input: {
   readonly requestId?: string
   readonly retryAfterMillis?: number
   readonly details?: Readonly<Record<string, unknown>>
+  readonly additionalSafeDetails?: Readonly<Record<string, unknown>>
 }): Exclude<Request, Transport | RequestTimeout | InvalidResponse> => {
   const descriptor = input.code === undefined ? undefined : catalog[input.code]
   const selectedVariant = input.variant === undefined ? undefined : descriptor?.[3][input.variant]
@@ -123,7 +159,7 @@ export const fromApi = (input: {
     ...(input.code === undefined ? {} : { code: redact(input.code) }),
     ...(input.requestId === undefined ? {} : { requestId: redact(input.requestId) }),
     ...(input.retryAfterMillis === undefined ? {} : { retryAfterMillis: input.retryAfterMillis }),
-    details: sanitizeRecord(details),
+    details: sanitizeRecord({ ...details, ...input.additionalSafeDetails }),
   }
   if (status === 401) return new Authentication(fields)
   if (status === 403) return new PermissionDenied(fields)

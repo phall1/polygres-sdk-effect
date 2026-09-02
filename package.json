@@ -25,10 +25,13 @@
     "format": "bunx biome check --write .",
     "test": "bun test",
     "contracts:check": "bun run scripts/verify-contract.ts",
+    "contracts:surface": "bun run scripts/generate-effect-surface.ts",
     "contracts:refresh": "bun run scripts/refresh-contract.ts",
+    "catalog:generate": "bun run scripts/generate-error-catalog.ts",
     "package:check": "bun run scripts/verify-package.ts",
     "check": "bun run contracts:check && bun run lint && bun test && bun run build && bun run package:check",
-    "live:readiness": "bun run scripts/readiness.ts"
+    "live:readiness": "bun run scripts/readiness.ts",
+    "live:context": "bun run scripts/context-capabilities.ts"
   },
   "keywords": [
     "effect",

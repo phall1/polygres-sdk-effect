@@ -86,3 +86,9 @@ test("unknown HTTP 400 errors remain generic API failures", async () => {
     expect(error.details).toEqual({ echoed: "[REDACTED]" })
   }
 })
+
+test("catalog membership ignores inherited object properties", () => {
+  expect(PolygresError.isCatalogCode("__proto__")).toBe(false)
+  expect(PolygresError.isCatalogCode("constructor")).toBe(false)
+  expect(PolygresError.isCatalogCode("ROW_WRITE_OUTCOME_AMBIGUOUS")).toBe(true)
+})

@@ -3,19 +3,617 @@
   "default_api_version": "2026-08-04",
   "upstream_sdk_version": "0.4.1",
   "methods": [
-    { "public_name": "connectionInfo", "operation_id": "runtime_connection_info_get", "method": "GET", "path": "/v1/connection-info" },
-    { "public_name": "readiness", "operation_id": "runtime_retrieval_readiness", "method": "GET", "path": "/v1/retrieval/readiness" },
-    { "public_name": "graph.expand", "operation_id": "runtime_graph_expand", "method": "POST", "path": "/v1/graph/expand" },
-    { "public_name": "graph.neighborhood", "operation_id": "runtime_graph_neighborhood", "method": "POST", "path": "/v1/graph/neighborhood" },
-    { "public_name": "graph.related", "operation_id": "runtime_graph_related", "method": "POST", "path": "/v1/graph/related" },
-    { "public_name": "graph.path", "operation_id": "runtime_graph_path", "method": "POST", "path": "/v1/graph/path" },
-    { "public_name": "graph.connection", "operation_id": "runtime_graph_connection", "method": "POST", "path": "/v1/graph/connection" },
-    { "public_name": "vector.search", "operation_id": "runtime_vector_search", "method": "POST", "path": "/v1/vector/search" },
-    { "public_name": "vector.similarTo", "operation_id": "runtime_vector_similar_to", "method": "POST", "path": "/v1/vector/similar-to" },
-    { "public_name": "text.tsvector", "operation_id": "runtime_text_tsvector", "method": "POST", "path": "/v1/text/tsvector" },
-    { "public_name": "text.fuzzy", "operation_id": "runtime_text_fuzzy", "method": "POST", "path": "/v1/text/fuzzy" },
-    { "public_name": "hybrid.graphFirst", "operation_id": "runtime_hybrid_graph_first", "method": "POST", "path": "/v1/hybrid/graph-first" },
-    { "public_name": "hybrid.vectorFirst", "operation_id": "runtime_hybrid_vector_first", "method": "POST", "path": "/v1/hybrid/vector-first" },
-    { "public_name": "hybrid.joint", "operation_id": "runtime_hybrid_joint", "method": "POST", "path": "/v1/hybrid/joint" }
+    {
+      "public_name": "connectionInfo",
+      "operation_id": "runtime_connection_info_get",
+      "method": "GET",
+      "path": "/v1/connection-info"
+    },
+    {
+      "public_name": "readiness",
+      "operation_id": "runtime_retrieval_readiness",
+      "method": "GET",
+      "path": "/v1/retrieval/readiness"
+    },
+    {
+      "public_name": "graph.expand",
+      "operation_id": "runtime_graph_expand",
+      "method": "POST",
+      "path": "/v1/graph/expand"
+    },
+    {
+      "public_name": "graph.neighborhood",
+      "operation_id": "runtime_graph_neighborhood",
+      "method": "POST",
+      "path": "/v1/graph/neighborhood"
+    },
+    {
+      "public_name": "graph.related",
+      "operation_id": "runtime_graph_related",
+      "method": "POST",
+      "path": "/v1/graph/related"
+    },
+    {
+      "public_name": "graph.path",
+      "operation_id": "runtime_graph_path",
+      "method": "POST",
+      "path": "/v1/graph/path"
+    },
+    {
+      "public_name": "graph.connection",
+      "operation_id": "runtime_graph_connection",
+      "method": "POST",
+      "path": "/v1/graph/connection"
+    },
+    {
+      "public_name": "vector.search",
+      "operation_id": "runtime_vector_search",
+      "method": "POST",
+      "path": "/v1/vector/search"
+    },
+    {
+      "public_name": "vector.similarTo",
+      "operation_id": "runtime_vector_similar_to",
+      "method": "POST",
+      "path": "/v1/vector/similar-to"
+    },
+    {
+      "public_name": "text.tsvector",
+      "operation_id": "runtime_text_tsvector",
+      "method": "POST",
+      "path": "/v1/text/tsvector"
+    },
+    {
+      "public_name": "text.fuzzy",
+      "operation_id": "runtime_text_fuzzy",
+      "method": "POST",
+      "path": "/v1/text/fuzzy"
+    },
+    {
+      "public_name": "hybrid.graphFirst",
+      "operation_id": "runtime_hybrid_graph_first",
+      "method": "POST",
+      "path": "/v1/hybrid/graph-first"
+    },
+    {
+      "public_name": "hybrid.vectorFirst",
+      "operation_id": "runtime_hybrid_vector_first",
+      "method": "POST",
+      "path": "/v1/hybrid/vector-first"
+    },
+    {
+      "public_name": "hybrid.joint",
+      "operation_id": "runtime_hybrid_joint",
+      "method": "POST",
+      "path": "/v1/hybrid/joint"
+    },
+    {
+      "public_name": "rows.insert",
+      "operation_id": "runtime_write_row",
+      "method": "POST",
+      "path": "/v1/tables/{schema_name}/{table_name}/rows"
+    },
+    {
+      "public_name": "rows.upsert",
+      "operation_id": "runtime_write_row",
+      "method": "POST",
+      "path": "/v1/tables/{schema_name}/{table_name}/rows"
+    },
+    {
+      "public_name": "rows.ignore",
+      "operation_id": "runtime_write_row",
+      "method": "POST",
+      "path": "/v1/tables/{schema_name}/{table_name}/rows"
+    },
+    {
+      "public_name": "rows.validate",
+      "operation_id": "runtime_validate_row_write",
+      "method": "POST",
+      "path": "/v1/tables/{schema_name}/{table_name}/rows/validate"
+    },
+    {
+      "public_name": "context.acknowledgeOnboarding",
+      "operation_id": "runtime_context_acknowledge_onboarding",
+      "method": "POST",
+      "path": "/v1/context/onboarding/acknowledge"
+    },
+    {
+      "public_name": "context.addFilterColumn",
+      "operation_id": "runtime_context_add_filter_column",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/filters/columns"
+    },
+    {
+      "public_name": "context.addJsonbFilterPath",
+      "operation_id": "runtime_context_add_filter_jsonb_path",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/filters/jsonb-paths"
+    },
+    {
+      "public_name": "context.addVector",
+      "operation_id": "runtime_context_add_vector",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/vectors"
+    },
+    {
+      "public_name": "context.backfillPoints",
+      "operation_id": "runtime_context_backfill_points",
+      "method": "POST",
+      "path": "/v1/context/points/backfill"
+    },
+    {
+      "public_name": "context.bulkDeletePoints",
+      "operation_id": "runtime_context_bulk_delete_points",
+      "method": "POST",
+      "path": "/v1/context/points/bulk-delete"
+    },
+    {
+      "public_name": "context.bulkUpsertPoints",
+      "operation_id": "runtime_context_bulk_upsert_points",
+      "method": "POST",
+      "path": "/v1/context/points/bulk-upsert"
+    },
+    {
+      "public_name": "context.cancelOperation",
+      "operation_id": "runtime_context_cancel_operation",
+      "method": "POST",
+      "path": "/v1/context/operations/{operation_id}/cancel"
+    },
+    {
+      "public_name": "context.candidateSearch",
+      "operation_id": "runtime_context_candidate_search",
+      "method": "POST",
+      "path": "/v1/context/search/candidates"
+    },
+    {
+      "public_name": "context.clearPayload",
+      "operation_id": "runtime_context_clear_payload",
+      "method": "POST",
+      "path": "/v1/context/points/payload/clear"
+    },
+    {
+      "public_name": "context.collectionAliases",
+      "operation_id": "runtime_context_list_collection_aliases",
+      "method": "GET",
+      "path": "/v1/context/aliases"
+    },
+    {
+      "public_name": "context.collectionInfo",
+      "operation_id": "runtime_context_collection_info",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/info"
+    },
+    {
+      "public_name": "context.collectionLimits",
+      "operation_id": "runtime_context_collection_limits",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/limits"
+    },
+    {
+      "public_name": "context.collectionVectors",
+      "operation_id": "runtime_context_collection_vectors",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/vectors"
+    },
+    {
+      "public_name": "context.configureCollectionLimits",
+      "operation_id": "runtime_context_configure_collection_limits",
+      "method": "PATCH",
+      "path": "/v1/context/collections/by-name/{collection_name}/limits"
+    },
+    {
+      "public_name": "context.configureVector",
+      "operation_id": "runtime_context_configure_vector",
+      "method": "PATCH",
+      "path": "/v1/context/collections/by-name/{collection_name}/vectors/{vector_name}"
+    },
+    {
+      "public_name": "context.count",
+      "operation_id": "runtime_context_count",
+      "method": "POST",
+      "path": "/v1/context/count"
+    },
+    {
+      "public_name": "context.createCollection",
+      "operation_id": "runtime_context_create_collection",
+      "method": "POST",
+      "path": "/v1/context/collections"
+    },
+    {
+      "public_name": "context.createCollectionAlias",
+      "operation_id": "runtime_context_create_collection_alias",
+      "method": "POST",
+      "path": "/v1/context/aliases"
+    },
+    {
+      "public_name": "context.createEmbeddingMigration",
+      "operation_id": "runtime_context_create_embedding_migration",
+      "method": "POST",
+      "path": "/v1/context/collections/by-name/{collection_name}/embedding-migrations"
+    },
+    {
+      "public_name": "context.deleteCollection",
+      "operation_id": "runtime_context_delete_collection",
+      "method": "DELETE",
+      "path": "/v1/context/collections/{collection_id}"
+    },
+    {
+      "public_name": "context.deletePayload",
+      "operation_id": "runtime_context_delete_payload",
+      "method": "POST",
+      "path": "/v1/context/points/payload/delete"
+    },
+    {
+      "public_name": "context.deletePoints",
+      "operation_id": "runtime_context_delete_points",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/points/delete"
+    },
+    {
+      "public_name": "context.discover",
+      "operation_id": "runtime_context_discover_points",
+      "method": "POST",
+      "path": "/v1/context/search/discover"
+    },
+    {
+      "public_name": "context.discoverSources",
+      "operation_id": "runtime_context_discover",
+      "method": "POST",
+      "path": "/v1/context/discover"
+    },
+    {
+      "public_name": "context.dismissOnboarding",
+      "operation_id": "runtime_context_dismiss_onboarding",
+      "method": "POST",
+      "path": "/v1/context/onboarding/dismiss"
+    },
+    {
+      "public_name": "context.dropCollection",
+      "operation_id": "runtime_context_delete_collection",
+      "method": "DELETE",
+      "path": "/v1/context/collections/{collection_id}"
+    },
+    {
+      "public_name": "context.dropCollectionAlias",
+      "operation_id": "runtime_context_drop_collection_alias",
+      "method": "DELETE",
+      "path": "/v1/context/aliases/{alias_name}"
+    },
+    {
+      "public_name": "context.embeddingMigrations",
+      "operation_id": "runtime_context_embedding_migrations",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/embedding-migrations"
+    },
+    {
+      "public_name": "context.estimateIndexMemory",
+      "operation_id": "runtime_context_estimate_index_memory",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/indexes/{index_name}/memory-estimate"
+    },
+    {
+      "public_name": "context.evaluateOnboarding",
+      "operation_id": "runtime_context_evaluate_onboarding",
+      "method": "POST",
+      "path": "/v1/context/onboarding/evaluate"
+    },
+    {
+      "public_name": "context.executeQuery",
+      "operation_id": "runtime_context_execute_query",
+      "method": "POST",
+      "path": "/v1/context/query/execute"
+    },
+    {
+      "public_name": "context.explain",
+      "operation_id": "runtime_context_explain_query",
+      "method": "POST",
+      "path": "/v1/context/query/explain"
+    },
+    {
+      "public_name": "context.explore",
+      "operation_id": "runtime_context_explore",
+      "method": "POST",
+      "path": "/v1/context/explore"
+    },
+    {
+      "public_name": "context.facet",
+      "operation_id": "runtime_context_facets",
+      "method": "POST",
+      "path": "/v1/context/facets"
+    },
+    {
+      "public_name": "context.facets",
+      "operation_id": "runtime_context_facets",
+      "method": "POST",
+      "path": "/v1/context/facets"
+    },
+    {
+      "public_name": "context.getCapabilities",
+      "operation_id": "runtime_context_capabilities",
+      "method": "GET",
+      "path": "/v1/context/capabilities"
+    },
+    {
+      "public_name": "context.getCollection",
+      "operation_id": "runtime_context_get_collection",
+      "method": "GET",
+      "path": "/v1/context/collections/{collection_id}"
+    },
+    {
+      "public_name": "context.getCollectionDiagnostics",
+      "operation_id": "runtime_context_get_diagnostics",
+      "method": "GET",
+      "path": "/v1/context/collections/{collection_id}/diagnostics"
+    },
+    {
+      "public_name": "context.getCollectionStatus",
+      "operation_id": "runtime_context_get_status",
+      "method": "GET",
+      "path": "/v1/context/collections/{collection_id}/status"
+    },
+    {
+      "public_name": "context.getOnboarding",
+      "operation_id": "runtime_context_get_onboarding",
+      "method": "GET",
+      "path": "/v1/context/onboarding"
+    },
+    {
+      "public_name": "context.getOperation",
+      "operation_id": "runtime_context_get_operation",
+      "method": "GET",
+      "path": "/v1/context/operations/{operation_id}"
+    },
+    {
+      "public_name": "context.getPointStatus",
+      "operation_id": "runtime_context_get_point_status",
+      "method": "GET",
+      "path": "/v1/context/collections/{collection_id}/points/status"
+    },
+    {
+      "public_name": "context.graphFirst",
+      "operation_id": "runtime_context_graph_first",
+      "method": "POST",
+      "path": "/v1/context/hybrid/graph-first"
+    },
+    {
+      "public_name": "context.groupedSearch",
+      "operation_id": "runtime_context_grouped_search",
+      "method": "POST",
+      "path": "/v1/context/grouped-search"
+    },
+    {
+      "public_name": "context.indexAdvisor",
+      "operation_id": "runtime_context_index_advisor",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/index-advisor"
+    },
+    {
+      "public_name": "context.indexDiagnostics",
+      "operation_id": "runtime_context_index_diagnostics",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/indexes/{index_name}/diagnostics"
+    },
+    {
+      "public_name": "context.indexStatus",
+      "operation_id": "runtime_context_index_status",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/indexes/{index_name}/status"
+    },
+    {
+      "public_name": "context.joint",
+      "operation_id": "runtime_context_joint",
+      "method": "POST",
+      "path": "/v1/context/hybrid/joint"
+    },
+    {
+      "public_name": "context.listCollections",
+      "operation_id": "runtime_context_list_collections",
+      "method": "GET",
+      "path": "/v1/context/collections"
+    },
+    {
+      "public_name": "context.listFilters",
+      "operation_id": "runtime_context_list_filters",
+      "method": "GET",
+      "path": "/v1/context/collections/{collection_id}/filters"
+    },
+    {
+      "public_name": "context.listOperations",
+      "operation_id": "runtime_context_list_operations",
+      "method": "GET",
+      "path": "/v1/context/operations"
+    },
+    {
+      "public_name": "context.modelVersions",
+      "operation_id": "runtime_context_model_versions",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/model-versions"
+    },
+    {
+      "public_name": "context.optimizationStatus",
+      "operation_id": "runtime_context_optimization_status",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/optimization-status"
+    },
+    {
+      "public_name": "context.preflight",
+      "operation_id": "runtime_context_preflight",
+      "method": "POST",
+      "path": "/v1/context/preflight"
+    },
+    {
+      "public_name": "context.query",
+      "operation_id": "runtime_context_text_hybrid",
+      "method": "POST",
+      "path": "/v1/context/hybrid/text"
+    },
+    {
+      "public_name": "context.queryCohortStats",
+      "operation_id": "runtime_context_query_cohort_stats",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/query-cohort-stats"
+    },
+    {
+      "public_name": "context.queryExecutionStats",
+      "operation_id": "runtime_context_query_execution_stats",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/query-execution-stats"
+    },
+    {
+      "public_name": "context.rankFusion",
+      "operation_id": "runtime_context_rank_fusion",
+      "method": "POST",
+      "path": "/v1/context/hybrid/rank-fusion"
+    },
+    {
+      "public_name": "context.rawVectorSearch",
+      "operation_id": "runtime_context_raw_vector_search",
+      "method": "POST",
+      "path": "/v1/context/search/raw"
+    },
+    {
+      "public_name": "context.recallCheck",
+      "operation_id": "runtime_context_recall_check",
+      "method": "POST",
+      "path": "/v1/context/recall-check"
+    },
+    {
+      "public_name": "context.recommend",
+      "operation_id": "runtime_context_recommend",
+      "method": "POST",
+      "path": "/v1/context/recommend"
+    },
+    {
+      "public_name": "context.reconcilePoints",
+      "operation_id": "runtime_context_reconcile_points",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/points/reconcile"
+    },
+    {
+      "public_name": "context.refreshOnboarding",
+      "operation_id": "runtime_context_refresh_onboarding",
+      "method": "POST",
+      "path": "/v1/context/onboarding/refresh"
+    },
+    {
+      "public_name": "context.registerFilterColumn",
+      "operation_id": "runtime_context_add_filter_column",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/filters/columns"
+    },
+    {
+      "public_name": "context.registerJsonbPath",
+      "operation_id": "runtime_context_add_filter_jsonb_path",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/filters/jsonb-paths"
+    },
+    {
+      "public_name": "context.registerModelVersion",
+      "operation_id": "runtime_context_register_model_version",
+      "method": "POST",
+      "path": "/v1/context/collections/by-name/{collection_name}/model-versions"
+    },
+    {
+      "public_name": "context.registerVector",
+      "operation_id": "runtime_context_add_vector",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/vectors"
+    },
+    {
+      "public_name": "context.reindexCollection",
+      "operation_id": "runtime_context_reindex_collection",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/reindex"
+    },
+    {
+      "public_name": "context.retryOperation",
+      "operation_id": "runtime_context_retry_operation",
+      "method": "POST",
+      "path": "/v1/context/operations/{operation_id}/retry"
+    },
+    {
+      "public_name": "context.scroll",
+      "operation_id": "runtime_context_scroll_points",
+      "method": "GET",
+      "path": "/v1/context/collections/{collection_id}/points"
+    },
+    {
+      "public_name": "context.scrollPoints",
+      "operation_id": "runtime_context_scroll_points",
+      "method": "GET",
+      "path": "/v1/context/collections/{collection_id}/points"
+    },
+    {
+      "public_name": "context.search",
+      "operation_id": "runtime_context_search",
+      "method": "POST",
+      "path": "/v1/context/search"
+    },
+    {
+      "public_name": "context.setDefaultCollection",
+      "operation_id": "runtime_context_update_collection",
+      "method": "PATCH",
+      "path": "/v1/context/collections/{collection_id}"
+    },
+    {
+      "public_name": "context.setPayload",
+      "operation_id": "runtime_context_set_payload",
+      "method": "PUT",
+      "path": "/v1/context/points/payload"
+    },
+    {
+      "public_name": "context.telemetry",
+      "operation_id": "runtime_context_telemetry",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/telemetry"
+    },
+    {
+      "public_name": "context.textHybrid",
+      "operation_id": "runtime_context_text_hybrid",
+      "method": "POST",
+      "path": "/v1/context/hybrid/text"
+    },
+    {
+      "public_name": "context.updateCollection",
+      "operation_id": "runtime_context_update_collection",
+      "method": "PATCH",
+      "path": "/v1/context/collections/{collection_id}"
+    },
+    {
+      "public_name": "context.updateEmbeddingMigration",
+      "operation_id": "runtime_context_update_embedding_migration",
+      "method": "PATCH",
+      "path": "/v1/context/collections/by-name/{collection_name}/embedding-migrations/{migration_id}"
+    },
+    {
+      "public_name": "context.upsertPoints",
+      "operation_id": "runtime_context_upsert_points",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/points/upsert"
+    },
+    {
+      "public_name": "context.vacuumAdvice",
+      "operation_id": "runtime_context_vacuum_advice",
+      "method": "GET",
+      "path": "/v1/context/collections/by-name/{collection_name}/indexes/{index_name}/vacuum-advice"
+    },
+    {
+      "public_name": "context.vectorFirst",
+      "operation_id": "runtime_context_vector_first",
+      "method": "POST",
+      "path": "/v1/context/hybrid/vector-first"
+    },
+    {
+      "public_name": "context.verifyCollection",
+      "operation_id": "runtime_context_verify_collection",
+      "method": "POST",
+      "path": "/v1/context/collections/{collection_id}/verify"
+    },
+    {
+      "public_name": "context.waitForOperation",
+      "operation_id": "runtime_context_get_operation",
+      "method": "GET",
+      "path": "/v1/context/operations/{operation_id}"
+    }
   ]
 }

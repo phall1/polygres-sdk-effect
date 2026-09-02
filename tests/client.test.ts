@@ -1,14 +1,91 @@
 import { expect, test } from "bun:test"
 import { Effect, Option, Redacted, Stream } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
-
 import { Polygres, PolygresError } from "../src/index.js"
+import { availableCapabilities } from "./context-fixtures.js"
 
 const key = "poly_live_0123456789abcdef0123456789abcdef"
 const runtimeUrl = "https://p0123456789abcdef0123456.api.db.polygres.com/v1"
 
 const bodyOf = (request: Parameters<Parameters<typeof HttpClient.make>[0]>[0]): unknown =>
   request.body._tag === "Uint8Array" ? JSON.parse(new TextDecoder().decode(request.body.body)) : undefined
+
+test("the public client exposes all 96 Context methods", async () => {
+  const http = HttpClient.make(() => Effect.die("local Context builders must not dispatch"))
+  const client = await Polygres.make({ apiKey: key, runtimeUrl, maxRetries: 0 }).pipe(
+    Effect.provideService(HttpClient.HttpClient, http),
+    Effect.runPromise,
+  )
+
+  expect(Object.keys(client.context)).toHaveLength(96)
+  expect(typeof client.context.createCollection).toBe("function")
+  expect(typeof client.context.waitForOperation).toBe("function")
+  expect(client.context.queryNearest({ vector: [0.1, 0.2] })).toEqual({
+    kind: "nearest",
+    vector: [0.1, 0.2],
+    limit: 10,
+  })
+})
+
+test("public Context requests compose exactly one API version path segment", async () => {
+  let url = ""
+  const http = HttpClient.make((request) => {
+    url = request.url
+    return Effect.succeed(
+      HttpClientResponse.fromWeb(request, Response.json(availableCapabilities({ future_field: "kept" }))),
+    )
+  })
+  const capabilities = await Effect.gen(function* () {
+    const client = yield* Polygres.make({ apiKey: key, runtimeUrl, maxRetries: 0 })
+    return yield* client.context.getCapabilities({})
+  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.runPromise)
+
+  expect(url).toBe(`${runtimeUrl}/context/capabilities`)
+  expect(capabilities.metadata).toEqual({ future_field: "kept" })
+})
+
+test("client deadline bounds direct, cursor, and waiter Context effects", async () => {
+  const http = HttpClient.make(() => Effect.never)
+  const errors = await Effect.gen(function* () {
+    const client = yield* Polygres.make({ apiKey: key, runtimeUrl, maxRetries: 0, deadline: "5 millis" })
+    return yield* Effect.all([
+      client.context.collectionAliases({}).pipe(Effect.flip),
+      client.context.listCollections.page({}).pipe(Effect.flip),
+      client.context
+        .waitForOperation({
+          operationId: "00000000-0000-0000-0000-000000000002",
+          timeout: "1 minute",
+        })
+        .pipe(Effect.flip),
+    ])
+  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.runPromise)
+
+  for (const error of errors) {
+    expect(error).toBeInstanceOf(PolygresError.RequestTimeout)
+    if (error instanceof PolygresError.RequestTimeout) expect(error.kind).toBe("deadline")
+  }
+})
+
+test("one Context deadline covers capability preflight and target dispatch", async () => {
+  const urls: string[] = []
+  const http = HttpClient.make((request) => {
+    urls.push(request.url)
+    return request.url.endsWith("/context/capabilities")
+      ? Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(availableCapabilities())))
+      : Effect.never
+  })
+  const error = await Effect.gen(function* () {
+    const client = yield* Polygres.make({ apiKey: key, runtimeUrl, maxRetries: 0, deadline: "5 millis" })
+    return yield* Effect.flip(client.context.search({ collection: "support", embedding: [0.1] }))
+  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.runPromise)
+
+  expect(error).toBeInstanceOf(PolygresError.RequestTimeout)
+  if (error instanceof PolygresError.RequestTimeout) {
+    expect(error.operation).toBe("context.search")
+    expect(error.kind).toBe("deadline")
+  }
+  expect(urls).toEqual([`${runtimeUrl}/context/capabilities`, `${runtimeUrl}/context/search`])
+})
 
 test("readiness protects headers and returns a camelCase domain model", async () => {
   let observed:

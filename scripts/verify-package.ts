@@ -18,14 +18,16 @@ try {
     join(directory, "consumer.ts"),
     `import type { Effect } from "effect"
 import type { HttpClient } from "effect/unstable/http"
-import { Polygres, PolygresError, Vector } from "polygres-sdk-effect"
-if (!Polygres.Client || !Polygres.make || !Vector.SearchInput) throw new Error("missing public exports")
+import { Context, ContextQuery, Operation, Polygres, PolygresError, Rows, Vector } from "polygres-sdk-effect"
+if (!Polygres.Client || !Polygres.make || !Context.Collection || !ContextQuery.QueryPlan || !Operation.Value || !Rows.WriteResult || !Vector.SearchInput) throw new Error("missing public exports")
 if (Polygres.VERSION !== ${JSON.stringify(packageJson.version)}) throw new Error("version mismatch")
 const client: Effect.Effect<Polygres.Service, PolygresError.Configuration, HttpClient.HttpClient> = Polygres.make({
   apiKey: "poly_live_0123456789abcdef0123456789abcdef",
   projectId: "p0123456789abcdef0123456"
 })
+const contextMethod: keyof Polygres.Service["context"] = "createCollection"
 void client
+void contextMethod
 console.log(Polygres.VERSION)
 `,
   )
@@ -52,13 +54,13 @@ console.log(Polygres.VERSION)
     [
       "bun",
       "-e",
-      'import { Graph, Page, Polygres, PolygresError, Runtime, Vector } from "polygres-sdk-effect"; if (!Polygres.Client || !Polygres.make || !Graph.PathInput || !Page.Value || !PolygresError.InvalidInput || !Runtime.Readiness || !Vector.SearchInput) process.exit(1)',
+      'import { Context, ContextQuery, Graph, Operation, Page, Polygres, PolygresError, Rows, Runtime, Vector } from "polygres-sdk-effect"; if (!Polygres.Client || !Polygres.make || !Context.Collection || !ContextQuery.QueryPlan || !Graph.PathInput || !Operation.Value || !Page.Value || !PolygresError.InvalidInput || !Rows.WriteResult || !Runtime.Readiness || !Vector.SearchInput) process.exit(1)',
     ],
     [
       "node",
       "--input-type=module",
       "-e",
-      'const sdk = await import("polygres-sdk-effect"); if (!sdk.Polygres?.Client || !sdk.Vector?.SearchInput) process.exit(1)',
+      'const sdk = await import("polygres-sdk-effect"); if (!sdk.Context?.Collection || !sdk.ContextQuery?.QueryPlan || !sdk.Operation?.Value || !sdk.Polygres?.Client || !sdk.Rows?.WriteResult || !sdk.Vector?.SearchInput) process.exit(1)',
     ],
     ["bun", "build", "./consumer.ts", "--target", "browser", "--outdir", "./browser-dist"],
     ["node", "./browser-dist/consumer.js"],

@@ -22,7 +22,11 @@ This project is pre-1.0 while Effect 4 and the Polygres Runtime contract are bot
 - Breaking public API changes require a minor release and migration notes.
 - Runtime behavior is pinned with `X-Polygres-Api-Version`, independently of package version.
 
-The initial compatibility baseline is the 14-method retrieval surface present since the official Python SDK 0.1 line. Modern pgContext and row-write support will only be marked stable after their retry, idempotency, and operation-waiting semantics have contract tests.
+The compatibility baseline includes the original 14-method retrieval surface, `rows.validate`, `rows.insert`, `rows.upsert`, `rows.ignore`, and all 96 public pgContext methods from Python SDK 0.4.1. Those Context methods comprise 83 direct HTTP methods, 12 local query builders, and one composite operation waiter. Stable aliases remain independent public methods while sharing exact operation bindings.
+
+Row writes have dedicated contracts for local validation, caller-owned idempotency, non-retry behavior, ambiguous initial outcomes, request-bound responses, and optional Context operation waiting. Contract-declared idempotent Context mutations reuse one eager key and byte-identical body across internal or external Effect retries. Ordinary Context writes dispatch once.
+
+Retry behavior follows `python-sdk-v1.methods.json`, not HTTP verb inference or incidental transport flags in the Python implementation. The pinned manifest currently classifies `candidateSearch`, `rawVectorSearch`, `recommend`, `discover`, and `explore` as non-retryable even though Python passes `retryable=True`; this SDK keeps the safer manifest policy until the upstream contract resolves that discrepancy.
 
 ## Runtime Support
 

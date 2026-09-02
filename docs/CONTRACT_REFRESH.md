@@ -24,6 +24,10 @@ bun run contracts:refresh -- update --format prompt
 
 This writes exact downloaded bytes and `contracts/upstream-v1.lock.json`, runs the offline verifier, and prints a task suitable for any coding agent. The updater never edits `effect-sdk-v1.surface.json` or SDK code.
 
+After reviewing an error-catalog change, run `bun run catalog:generate` explicitly. The generator parses only the pinned Python literal data, never imports or executes Python, and formats the private TypeScript lookup with the pinned toolchain. The offline verifier deep-compares every generated descriptor, including retry class, with that inert source.
+
+After changing the implemented HTTP surface, run `bun run contracts:surface`. This generates the declaration from the reviewed retrieval, row, and Context binding registries. Stable aliases may share an operation ID only when their method and path are identical. `contracts:check` rejects a stale generated surface, a conflicting shared binding, or any mismatch with the pinned OpenAPI.
+
 Updates use an exclusive `contracts/.contract-refresh.lock` directory. A second checker or updater fails rather than reading or overwriting a transaction in progress, and an updater rechecks the expected local snapshot after taking the lock. Each replacement is atomic, but the four-file transaction is not claimed to be atomic across a process or machine crash. A handled write failure restores files while the updater still owns the lock; if that restoration is incomplete, the error identifies a preserved `.contract-refresh-stage-*` recovery directory. An abandoned lock after an unclean process termination must be inspected before it is removed manually.
 
 An agent-neutral loop is:

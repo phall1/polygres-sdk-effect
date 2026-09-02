@@ -21,18 +21,18 @@ export interface Value<A> {
 
 export type WithoutCursor<Input> = Omit<Input, "cursor">
 
-export interface Operation<Input extends { readonly cursor?: string }, Item> {
-  readonly page: (input: Input) => Effect.Effect<Value<Item>, PolygresError.Search>
-  readonly stream: (input: WithoutCursor<Input>) => Stream.Stream<Item, PolygresError.Search>
+export interface Operation<Input extends { readonly cursor?: string }, Item, Error = PolygresError.Search> {
+  readonly page: (input: Input) => Effect.Effect<Value<Item>, Error>
+  readonly stream: (input: WithoutCursor<Input>) => Stream.Stream<Item, Error>
 }
 
-export const makeOperation = <Input extends { readonly cursor?: string }, Item>(
-  page: (input: Input) => Effect.Effect<Value<Item>, PolygresError.Search>,
-): Operation<Input, Item> => ({
+export const makeOperation = <Input extends { readonly cursor?: string }, Item, Error = PolygresError.Search>(
+  page: (input: Input) => Effect.Effect<Value<Item>, Error>,
+): Operation<Input, Item, Error> => ({
   page,
   stream: (input) => {
     const { cursor: _ignored, ...initial } = input as Input
-    return Stream.paginate<string | undefined, Item, PolygresError.Search>(undefined, (cursor) =>
+    return Stream.paginate<string | undefined, Item, Error>(undefined, (cursor) =>
       page({ ...initial, ...(cursor === undefined ? {} : { cursor }) } as Input).pipe(
         Effect.map(
           (value) =>

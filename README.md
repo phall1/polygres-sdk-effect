@@ -61,16 +61,20 @@ await Effect.runPromise(program)
 
 - Nullary Runtime methods: `polygres.readiness()` and `polygres.connectionInfo()`.
 - Object inputs: `polygres.graph.path({ source, target, maxDepth: 5 })`.
+- Row writes: `polygres.rows.upsert({ schema, table, row, conflictColumns, idempotencyKey })`.
+- Context administration: `polygres.context.createCollection({ name, source: { mode, schemaName, tableName }, vector: { dimensions }, idempotencyKey })`.
+- Context retrieval: `polygres.context.search({ collection, embedding, filter })`.
+- Durable operations: `polygres.context.waitForOperation({ operationId, timeout: "5 minutes" })`.
 - Paginated reads: `polygres.vector.search.page(input)`.
-- Cold auto-pagination: `polygres.vector.search.stream(inputWithoutCursor)`.
-- Domain schemas and types: `Runtime.Readiness`, `Graph.PathInput`, `Vector.Result`, and peers.
+- Cold auto-pagination: `polygres.vector.search.stream(inputWithoutCursor)` and Context cursor operations.
+- Domain schemas and types: `Context.Collection`, `ContextQuery.QueryPlan`, `Operation.Value`, `Rows.WriteResult`, and peers.
 - Narrow errors: construction returns `PolygresError.Configuration`; retrieval returns `PolygresError.Request | PolygresError.InvalidInput`.
 - CamelCase public models with Runtime wire names confined to private adapters.
 - `Option` for nullable cursors, request IDs, and ranking fields.
 
-`timeout` limits each HTTP attempt independently. Set `deadline` when the complete operation, including retries, backoff, response reading, and schema adaptation, must share one time budget. Both options accept Effect `Duration.Input` values.
+`timeout` limits each HTTP attempt independently. Set `deadline` when the complete operation, including retries, backoff, response reading, and schema adaptation, must share one time budget. Both options accept Effect `Duration.Input` values. Row writes are never automatically retried. Context-backed row writes require a caller-provided `idempotencyKey`; uncertain outcomes fail with `PolygresError.AmbiguousWrite`.
 
-The stable retrieval surface contains readiness and passwordless connection metadata plus graph, vector, PostgreSQL text, and hybrid retrieval. Row writes and pgContext administration remain deferred until their idempotency, ambiguous-write, and operation-wait semantics have dedicated contracts.
+The stable surface contains readiness and passwordless connection metadata, graph/vector/text/hybrid retrieval, validated single-row insert/upsert/ignore operations, and all 96 pinned pgContext methods. The Context surface includes 83 direct HTTP methods, 12 immutable query-plan builders, stable aliases, cursor pagination, and one durable operation waiter. Pending row reconciliation can optionally be observed with `waitForContext`; a successful wait replays the same idempotent request to obtain the terminal row result.
 
 See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -90,6 +94,6 @@ bun install
 bun run check
 ```
 
-For a secret-safe live readiness check, set `POLY_API_KEY` and either `POLY_PROJECT_ID` or `POLY_RUNTIME_URL`, then run `bun run live:readiness`.
+For secret-safe, non-mutating live checks, set `POLY_API_KEY` and either `POLY_PROJECT_ID` or `POLY_RUNTIME_URL`, then run `bun run live:readiness` and `bun run live:context`.
 
 Never commit Project API keys or PostgreSQL passwords.

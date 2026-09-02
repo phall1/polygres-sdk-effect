@@ -2,7 +2,7 @@
 
 The goal is complete, contract-verified coverage of the application-facing Polygres Runtime API without reproducing the Python SDK's synchronous architecture.
 
-## 0.1: Retrieval Foundation
+## 0.1: Retrieval Foundation (complete)
 
 - Stable 14-method graph, vector, text, and hybrid retrieval baseline.
 - Effect service/layer composition and injectable HTTP transport.
@@ -10,7 +10,7 @@ The goal is complete, contract-verified coverage of the application-facing Polyg
 - Cursor pagination as an Effect Stream.
 - Bun, Node.js, and Cloudflare-compatible distribution.
 
-## 0.2: Safe Mutations And Context Core
+## 0.2: Safe Mutations And Context Core (implemented, unreleased)
 
 - Row validation, insert, upsert, and ignore.
 - Explicit ambiguous-write errors and zero automatic row-write retries.
@@ -18,7 +18,7 @@ The goal is complete, contract-verified coverage of the application-facing Polyg
 - Context capabilities, collection lifecycle, search/query/count/facets, and durable operation polling.
 - Stage-aware operation waiter with deadline and cancellation semantics.
 
-## 0.3: Full Runtime SDK Parity
+## 0.3: Full Runtime SDK Parity (implemented, unreleased)
 
 - Remaining application-facing Context administration and retrieval methods.
 - Local typed query-plan builders.
