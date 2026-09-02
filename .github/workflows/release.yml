@@ -144,7 +144,6 @@ jobs:
         run: npm install --global npm@12.0.2
       - name: Verify and publish package
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           TARBALL: ${{ needs.package.outputs.tarball }}
           VERSION: ${{ needs.package.outputs.version }}
         run: |
