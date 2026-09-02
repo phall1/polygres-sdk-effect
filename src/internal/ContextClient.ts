@@ -1,4 +1,4 @@
-import { Clock, DateTime, Duration, Effect, Option, Schema } from "effect"
+import { Clock, DateTime, Duration, Effect, Option, Schema, SynchronizedRef } from "effect"
 
 import * as Context from "../Context.js"
 import * as ContextQuery from "../ContextQuery.js"
@@ -483,6 +483,7 @@ const operationWireFields = new Set([
 ])
 
 const queryNames = new Set(["listCollections", "listOperations", "scroll", "scrollPoints"])
+const capabilitiesTtlNanos = Duration.toNanosUnsafe(Duration.seconds(60))
 const emptyBodies = new Set([
   "acknowledgeOnboarding",
   "cancelOperation",
@@ -561,7 +562,7 @@ const decode = <A>(
       const root = record(ContextWire.normalizeResponse(response.payload))
       const known = new Set(Object.keys(value as object))
       known.add("requestId")
-      for (const key of [...known]) known.add(snake(key))
+      for (const key of Array.from(known)) known.add(snake(key))
       return {
         ...value,
         ...(id === undefined ? {} : { requestId: id }),
@@ -1074,12 +1075,11 @@ export const make = (transport: HttpTransport.Service, options: MakeOptions = {}
   )
   const capabilitiesBinding = operations.find((binding) => binding.publicName === "getCapabilities")
   if (capabilitiesBinding === undefined) throw new Error("Missing getCapabilities binding")
-  let capabilitiesCache:
-    | { readonly value: Response<Context.CapabilitiesResponse>; readonly cachedAt: bigint }
-    | undefined
+  type CapabilitiesCache = { readonly value: Response<Context.CapabilitiesResponse>; readonly cachedAt: bigint }
+  const capabilitiesCache = SynchronizedRef.makeUnsafe<CapabilitiesCache | undefined>(undefined)
 
   const complete = <A, E>(operation: string, effect: Effect.Effect<A, E>) =>
-    options.deadline === undefined
+    (options.deadline === undefined
       ? effect
       : effect.pipe(
           Effect.timeoutOrElse({
@@ -1095,18 +1095,30 @@ export const make = (transport: HttpTransport.Service, options: MakeOptions = {}
               ),
           }),
         )
+    ).pipe(Effect.withSpan(`Polygres.${operation}`))
 
   const fetchCapabilities = (timeout: Duration.Duration | undefined) =>
     prepare(capabilitiesBinding, timeout === undefined ? {} : { timeout }, undefined).pipe(
       Effect.flatMap(({ request }) => transport.requestWithMetadata(request)),
       Effect.flatMap((response) => decode("context.getCapabilities", Context.CapabilitiesResponse, response)),
-      Effect.flatMap((value) =>
-        Clock.monotonicTimeNanos.pipe(
-          Effect.map((cachedAt) => {
-            capabilitiesCache = { value, cachedAt }
-            return value
-          }),
-        ),
+    )
+
+  const loadCapabilities = (
+    timeout: Duration.Duration | undefined,
+    useCached: (value: Response<Context.CapabilitiesResponse>) => boolean,
+  ) =>
+    SynchronizedRef.modifyEffect(capabilitiesCache, (cached) =>
+      Clock.monotonicTimeNanos.pipe(
+        Effect.flatMap((now) => {
+          if (cached !== undefined && now - cached.cachedAt < capabilitiesTtlNanos && useCached(cached.value)) {
+            return Effect.succeed([cached.value, cached] as const)
+          }
+          return fetchCapabilities(timeout).pipe(
+            Effect.flatMap((value) =>
+              Clock.monotonicTimeNanos.pipe(Effect.map((cachedAt) => [value, { value, cachedAt }] as const)),
+            ),
+          )
+        }),
       ),
     )
 
@@ -1114,20 +1126,16 @@ export const make = (transport: HttpTransport.Service, options: MakeOptions = {}
     const requirement = capabilityRequirements[name]
     if (requirement === undefined) return Effect.void
     return Effect.gen(function* () {
-      const now = yield* Clock.monotonicTimeNanos
-      const cached = capabilitiesCache
-      const capabilities =
-        cached === undefined || now - cached.cachedAt >= 60_000_000_000n || !cached.value[requirement.field]
-          ? yield* fetchCapabilities(request.timeout)
-          : cached.value
+      const capabilities = yield* loadCapabilities(request.timeout, (value) => value[requirement.field])
       if (!capabilities[requirement.field]) {
         const blocker = Option.getOrNull(capabilities[`${requirement.field}Blocker`])
         const blockerMessage = Option.getOrUndefined(capabilities[`${requirement.field}BlockerMessage`])
         const message = blockerMessage ?? `Context ${requirement.wireName.replaceAll("_", " ")} is unavailable.`
-        return yield* capabilityInputError(request.operation, message, "CONTEXT_CAPABILITY_UNAVAILABLE", {
+        yield* capabilityInputError(request.operation, message, "CONTEXT_CAPABILITY_UNAVAILABLE", {
           capability: requirement.wireName,
           blocker,
         })
+        return
       }
       if (requirement.validateLimits) {
         yield* validateCapabilityLimits(request.operation, capabilities, record(request.body))
@@ -1151,7 +1159,7 @@ export const make = (transport: HttpTransport.Service, options: MakeOptions = {}
       if (binding.publicName === "getCapabilities") {
         return complete(
           "context.getCapabilities",
-          prepared.pipe(Effect.flatMap(({ request }) => fetchCapabilities(request.timeout))),
+          prepared.pipe(Effect.flatMap(({ request }) => loadCapabilities(request.timeout, () => false))),
         )
       }
       const effect = prepared.pipe(

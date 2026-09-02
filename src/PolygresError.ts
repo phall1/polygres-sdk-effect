@@ -108,6 +108,16 @@ export const addDetails = <E extends Request>(error: E, additions: Readonly<Reco
   return clone
 }
 
+const safeString = (value: unknown): string => {
+  let text: string
+  if (typeof value === "string") text = value
+  else if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") text = String(value)
+  else if (typeof value === "symbol") text = value.description ?? "symbol"
+  else if (typeof value === "function") text = value.name === "" ? "function" : value.name
+  else text = value === undefined ? "undefined" : "object"
+  return redact(text)
+}
+
 const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1({
   leafHook: (issue) => issue._tag,
   checkHook: () => "Failed schema check",
@@ -115,7 +125,7 @@ const formatSchemaIssue = SchemaIssue.makeFormatterStandardSchemaV1({
 
 export const schemaIssues = (issue: SchemaIssue.Issue) =>
   formatSchemaIssue(issue).issues.map((entry) => ({
-    path: (entry.path ?? []).map((part) => redact(String(part))),
+    path: (entry.path ?? []).map(safeString),
     message: entry.message,
   }))
 
@@ -125,7 +135,7 @@ const sanitize = (value: unknown): Schema.Schema.Type<typeof Schema.Json> => {
     return value
   if (Array.isArray(value)) return value.map(sanitize)
   if (typeof value === "object") return sanitizeRecord(value as Readonly<Record<string, unknown>>)
-  return String(value)
+  return safeString(value)
 }
 
 const sanitizeRecord = (value: Readonly<Record<string, unknown>>) =>

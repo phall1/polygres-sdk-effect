@@ -36,7 +36,7 @@ const protectedHeaders = new Set([
 ])
 
 export interface Options {
-  readonly apiKey: Redacted.Redacted<string> | string
+  readonly apiKey: Redacted.Redacted | string
   readonly projectId?: string
   readonly projectMode?: "standard" | "synced"
   readonly runtimeUrl?: string
@@ -96,7 +96,7 @@ type InputSchema<A> = Schema.Schema<A> & { readonly DecodingServices: never }
 type ResponseSchema<A> = Schema.Schema<A> & { readonly DecodingServices: never }
 
 const parseInput = <A>(operation: string, schema: InputSchema<A>, input: unknown) =>
-  Schema.decodeUnknownEffect(schema)(input).pipe(
+  Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(
       (cause) =>
         new PolygresError.InvalidInput({

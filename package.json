@@ -21,15 +21,17 @@
   "scripts": {
     "build": "bun run clean && bunx tsc -p tsconfig.build.json",
     "clean": "rm -rf dist",
-    "lint": "bunx biome check . && bunx tsc --noEmit",
-    "format": "bunx biome check --write .",
+    "lint": "oxlint --deny-warnings .",
+    "typecheck": "tsc --noEmit",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
     "test": "bun test",
     "contracts:check": "bun run scripts/verify-contract.ts",
     "contracts:surface": "bun run scripts/generate-effect-surface.ts",
     "contracts:refresh": "bun run scripts/refresh-contract.ts",
     "catalog:generate": "bun run scripts/generate-error-catalog.ts",
     "package:check": "bun run scripts/verify-package.ts",
-    "check": "bun run contracts:check && bun run lint && bun test && bun run build && bun run package:check",
+    "check": "bun run contracts:check && bun run lint && bun run format:check && bun run typecheck && bun test && bun run build && bun run package:check",
     "live:readiness": "bun run scripts/readiness.ts",
     "live:context": "bun run scripts/context-capabilities.ts"
   },
@@ -60,8 +62,10 @@
   },
   "devDependencies": {
     "@types/bun": "1.4.0",
-    "@biomejs/biome": "2.5.11",
     "effect": "4.0.0-rc.112",
+    "oxfmt": "0.66.0",
+    "oxlint": "1.81.0",
+    "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2"
   }
 }

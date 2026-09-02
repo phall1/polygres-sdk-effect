@@ -113,7 +113,7 @@ test("operation bindings preserve unique operations, aliases, policies, and pagi
   for (const operationId of aliasedOperationIds) {
     const shared = aliases.get(operationId)
     expect(shared).toBeDefined()
-    expect(new Set(shared?.map(({ publicName: _, ...binding }) => JSON.stringify(binding))).size).toBe(1)
+    expect(new Set(shared?.map(({ publicName: _publicName, ...binding }) => JSON.stringify(binding))).size).toBe(1)
   }
 })
 

@@ -382,9 +382,11 @@ test("contract lock excludes concurrent readers and writers", async () => {
     await blocked
   })
   await acquired
+  // oxlint-disable-next-line typescript/await-thenable -- Bun's matcher type omits the runtime Promise.
   await expect(withContractLock(root, async () => undefined)).rejects.toThrow("locked by another process")
   release()
   await holder
+  // oxlint-disable-next-line typescript/await-thenable -- Bun's matcher type omits the runtime Promise.
   await expect(withContractLock(root, async () => "available")).resolves.toBe("available")
   await rm(root, { recursive: true, force: true })
 })
@@ -403,6 +405,7 @@ test("contract update rejects a lock changed before write ownership", async () =
     writeFile(join(contracts, "upstream-v1.lock.json"), `${JSON.stringify(changedLock, null, 2)}\n`),
   ])
 
+  // oxlint-disable-next-line typescript/await-thenable -- Bun's matcher type omits the runtime Promise.
   await expect(writeBundle(root, current, surface, expectedLock)).rejects.toThrow(
     "Contract lock changed while refresh was running",
   )

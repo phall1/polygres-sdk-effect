@@ -4,7 +4,7 @@ import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import * as PolygresError from "../PolygresError.js"
 
 export interface Config {
-  readonly apiKey: Redacted.Redacted<string>
+  readonly apiKey: Redacted.Redacted
   readonly baseUrl: string
   readonly timeout: Duration.Duration
   readonly maxRetries: number
@@ -75,19 +75,7 @@ const requestUrl = (config: Config, request: Request): URL => {
 }
 
 const makeRequest = (config: Config, request: Request): HttpClientRequest.HttpClientRequest => {
-  const url = requestUrl(config, request)
-  switch (request.method) {
-    case "DELETE":
-      return HttpClientRequest.delete(url)
-    case "GET":
-      return HttpClientRequest.get(url)
-    case "PATCH":
-      return HttpClientRequest.patch(url)
-    case "POST":
-      return HttpClientRequest.post(url)
-    case "PUT":
-      return HttpClientRequest.put(url)
-  }
+  return HttpClientRequest.make(request.method)(requestUrl(config, request))
 }
 
 const retryAfterMillis = (value: string | undefined): Effect.Effect<number | undefined> => {
@@ -110,7 +98,7 @@ const retryDelay = (attempt: number, retryAfter: number | undefined) =>
     ? Effect.succeed(Duration.millis(retryAfter))
     : Random.next.pipe(Effect.map((random) => Duration.millis(25 * 2 ** attempt + random * 5)))
 
-const parseJson = (text: string): unknown | undefined => {
+const parseJson = (text: string): unknown => {
   if (text.length === 0) return undefined
   try {
     return JSON.parse(text)

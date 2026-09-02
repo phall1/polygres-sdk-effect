@@ -412,6 +412,33 @@ test("positive capabilities are cached while negative capabilities refresh", asy
   ])
 })
 
+test("concurrent capability checks share one positive refresh", async () => {
+  let capabilityCalls = 0
+  const transport: HttpTransport.Service = {
+    request: () => Effect.die("unused"),
+    requestWithMetadata: (request) => {
+      if (request.operation !== "context.getCapabilities") return Effect.fail(transportError())
+      return Effect.sync(() => {
+        capabilityCalls++
+      }).pipe(
+        Effect.andThen(Effect.yieldNow),
+        Effect.as({ payload: availableCapabilities(), status: 200, headers: {} }),
+      )
+    },
+  }
+  const service = make(transport)
+
+  await Effect.all(
+    [
+      service.search({ collection: "support", embedding: [0.1] }).pipe(Effect.exit),
+      service.count({ collection: "support" }).pipe(Effect.exit),
+    ],
+    { concurrency: "unbounded" },
+  ).pipe(Effect.runPromise)
+
+  expect(capabilityCalls).toBe(1)
+})
+
 test("capability limits fail locally in Python order while facets ignore project search limits", async () => {
   const requests: HttpTransport.Request[] = []
   const transport: HttpTransport.Service = {
@@ -752,8 +779,8 @@ test("invalid paths, queries, bodies, and protected-header attempts fail before 
   const requests: HttpTransport.Request[] = []
   const service = make(capturingTransport(requests))
   const effects = [
-    service.getCollection({ collectionId: "support" as never }),
-    service.listCollections.page({ limit: 101 as never }),
+    service.getCollection({ collectionId: "support" }),
+    service.listCollections.page({ limit: 101 }),
     service.search({ collection: "support", embedding: [] }),
     service.reindexCollection({ collectionId, idempotencyKey: "" }),
     (service.reindexCollection as (input: unknown) => Effect.Effect<unknown, unknown>)({

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicolo-ribaudo/oxc-project.github.io/refs/heads/json-schema/src/public/.oxlintrc.schema.json",
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "suspicious": "warn"
+  },
+  "rules": {
+    "typescript/no-base-to-string": "warn",
+    // Suspicious category: suppress noisy rules
+    // Effect's nested function* closures inherently shadow outer scope
+    "no-shadow": "off",
+    // Effect error and data types conventionally use `_tag` discriminants
+    "no-underscore-dangle": "off",
+    // Namespace-heavy codebase makes this too noisy
+    "unicorn/consistent-function-scoping": "off",
+    // Opinionated: .sort()/.reverse() mutation is fine in this codebase
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    // Not relevant: this isn't a DOM event handler codebase
+    "unicorn/prefer-add-event-listener": "off",
+    // Bundler handles module resolution
+    "unicorn/require-module-specifiers": "off",
+    // postMessage target origin not relevant for this codebase
+    "unicorn/require-post-message-target-origin": "off",
+    // Side-effectful constructors are intentional in some places
+    "no-new": "off",
+
+    // Type-aware: catch unhandled promises
+    "typescript/no-floating-promises": "warn",
+    // Schema.Struct values are plain records but the rule reports their declared interfaces as classes
+    "typescript/no-misused-spread": "off",
+    // Wire adapters and negative tests narrow values only after runtime validation
+    "typescript/no-unsafe-type-assertion": "off",
+    // The standard invariant type-equality helper intentionally uses one-shot generic parameters
+    "typescript/no-unnecessary-type-parameters": "off"
+  },
+  "ignorePatterns": ["**/node_modules", "**/dist", "**/.build", "**/.sst", "**/*.d.ts", "**/sdk.gen.ts"]
+}

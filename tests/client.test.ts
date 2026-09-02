@@ -361,6 +361,22 @@ test("schema-owned inputs fail before transport", async () => {
   expect(calls).toBe(0)
 })
 
+test("schema-owned inputs reject excess properties before transport", async () => {
+  let calls = 0
+  const http = HttpClient.make((request) => {
+    calls++
+    return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({})))
+  })
+  const error = await Effect.gen(function* () {
+    const client = yield* Polygres.make({ apiKey: key, runtimeUrl })
+    return yield* Effect.flip(client.vector.search.page({ embedding: [0.1], typo: true } as never))
+  }).pipe(Effect.provideService(HttpClient.HttpClient, http), Effect.runPromise)
+
+  expect(error).toBeInstanceOf(PolygresError.InvalidInput)
+  if (error instanceof PolygresError.InvalidInput) expect(error.issues[0]?.path).toEqual(["typo"])
+  expect(calls).toBe(0)
+})
+
 test("graph path and connection never leak search-only fields", async () => {
   const bodies: unknown[] = []
   const http = HttpClient.make((request) => {

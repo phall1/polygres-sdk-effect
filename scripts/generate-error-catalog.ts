@@ -28,13 +28,13 @@ export const catalog: Readonly<Record<string, Descriptor>> = ${JSON.stringify(ca
 `
 
 export const formatErrorCatalog = async (catalog: ErrorCatalog): Promise<string> => {
-  const formatter = Bun.spawn(["bunx", "biome", "format", "--stdin-file-path", fileURLToPath(outputUrl)], {
+  const formatter = Bun.spawn(["bunx", "oxfmt", "--stdin-filepath", fileURLToPath(outputUrl)], {
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
   })
-  formatter.stdin.write(renderErrorCatalog(catalog))
-  formatter.stdin.end()
+  await formatter.stdin.write(renderErrorCatalog(catalog))
+  await formatter.stdin.end()
   const [status, output, error] = await Promise.all([
     formatter.exited,
     new Response(formatter.stdout).text(),

@@ -42,16 +42,16 @@ Prefer dependency injection? `Polygres.layer(options)` provides the yieldable `P
 
 ## API At A Glance
 
-| Need | API |
-| --- | --- |
-| Graph traversal | `db.graph.*` |
-| Vector search | `db.vector.*` |
-| Full-text search | `db.text.*` |
-| Hybrid ranking | `db.hybrid.*` |
-| Insert, upsert, ignore | `db.rows.*` |
-| Collections, points, indexes, search | `db.context.*` |
-| Async operation lifecycle | `db.context.waitForOperation(...)` |
-| Cursor pagination | `operation.page(...)` / `operation.stream(...)` |
+| Need                                 | API                                             |
+| ------------------------------------ | ----------------------------------------------- |
+| Graph traversal                      | `db.graph.*`                                    |
+| Vector search                        | `db.vector.*`                                   |
+| Full-text search                     | `db.text.*`                                     |
+| Hybrid ranking                       | `db.hybrid.*`                                   |
+| Insert, upsert, ignore               | `db.rows.*`                                     |
+| Collections, points, indexes, search | `db.context.*`                                  |
+| Async operation lifecycle            | `db.context.waitForOperation(...)`              |
+| Cursor pagination                    | `operation.page(...)` / `operation.stream(...)` |
 
 Every method takes one object input. Nullable response fields use `Option`. Runtime wire casing stays private.
 

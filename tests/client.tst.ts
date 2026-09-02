@@ -102,7 +102,7 @@ client.graph.related.page({ start: { schema: "public", table: "entities", id: "a
 client.graph.expand.page({ start: [{ schema: "public", table: "entities", id: "a" }] })
 
 // @ts-expect-error Public Runtime models do not leak wire casing.
-declare const leakedWireName: Runtime.Readiness["project_id"]
+export type LeakedWireName = Runtime.Readiness["project_id"]
 
 // @ts-expect-error Row methods accept one schema-owned object input.
 client.rows.insert("public", "events", { id: "one" })
@@ -111,4 +111,4 @@ client.rows.insert("public", "events", { id: "one" })
 client.rows.insert({ schema: "public", table: "events", row: { id: "one" }, conflictColumns: ["id"] })
 
 // @ts-expect-error Public row models do not leak wire casing.
-declare const leakedRowWireName: Rows.WriteResult["row_committed"]
+export type LeakedRowWireName = Rows.WriteResult["row_committed"]

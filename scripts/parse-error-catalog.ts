@@ -214,7 +214,7 @@ export const parsePythonErrorCatalog = (source: string): ErrorCatalog => {
         writable: true,
       })
     }
-    catalog[code] = [status as number, message, safe as ReadonlyArray<string>, variants, retryClass as RetryClass]
+    catalog[code] = [status as number, message, safe, variants, retryClass as RetryClass]
   }
   return catalog
 }

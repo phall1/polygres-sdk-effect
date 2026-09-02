@@ -92,3 +92,7 @@ test("catalog membership ignores inherited object properties", () => {
   expect(PolygresError.isCatalogCode("constructor")).toBe(false)
   expect(PolygresError.isCatalogCode("ROW_WRITE_OUTCOME_AMBIGUOUS")).toBe(true)
 })
+
+test("unsupported diagnostic scalars cannot bypass credential redaction", () => {
+  expect(PolygresError.sanitizeDetails({ diagnostic: Symbol(key) })).toEqual({ diagnostic: "[REDACTED]" })
+})

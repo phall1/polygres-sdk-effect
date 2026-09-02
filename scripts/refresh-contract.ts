@@ -340,7 +340,7 @@ const operationIndex = (openapi: OpenApi): Map<string, IndexedOperation> => {
       index.set(operationId, {
         method: method.toUpperCase(),
         path,
-        contract: operationContract(openapi, pathItem as JsonObject, candidate as JsonObject),
+        contract: operationContract(openapi, pathItem, candidate),
       })
     }
   }
@@ -672,7 +672,7 @@ export const withContractLock = async <A>(root: string, task: () => Promise<A>):
     await mkdir(lockDirectory)
   } catch (cause) {
     if (isObject(cause) && cause.code === "EEXIST") {
-      throw new Error(`Contract files are locked by another process: ${lockDirectory}`)
+      throw new Error(`Contract files are locked by another process: ${lockDirectory}`, { cause })
     }
     throw cause
   }
