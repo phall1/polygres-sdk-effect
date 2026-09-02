@@ -4,9 +4,7 @@
 
 Effect-native TypeScript SDK for the [Polygres](https://polygres.com) Runtime API.
 
-This package is independent and is not an official Evokoa package. The wire contract is derived from Evokoa's public Runtime OpenAPI document and official Python SDK.
-
-The design target is an upstreamable, production SDK rather than an application-specific wrapper. Public behavior is tracked against pinned machine-readable contracts; application transports remain injectable through Effect layers.
+This independent package is designed as an upstreamable production SDK. It uses Effect services, Layers, Schema, tagged errors, and Stream directly; applications provide the HTTP transport.
 
 ## Install
 
@@ -17,50 +15,73 @@ bun add polygres-sdk-effect effect@4.0.0-rc.112
 ## Usage
 
 ```ts
-import { Effect, Redacted } from "effect"
+import { Effect, Redacted, Stream } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
-import { make } from "polygres-sdk-effect"
+import { Polygres, PolygresError } from "polygres-sdk-effect"
 
-const program = Effect.gen(function* () {
-  const polygres = yield* make({
-    apiKey: Redacted.make(process.env.POLY_API_KEY!),
-    projectId: "p0123456789abcdef0123456",
-  })
-
-  const readiness = yield* polygres.readiness()
-  const evidence = yield* polygres.text.tsvector("intrusion campaign", {
-    config: "evidence_body",
-    limit: 10,
-  })
-
-  return { readiness, evidence }
+const PolygresLive = Polygres.layer({
+  apiKey: Redacted.make(process.env.POLY_API_KEY!),
+  projectId: "p0123456789abcdef0123456",
 })
 
-await program.pipe(
+const program = Effect.gen(function* () {
+  const polygres = yield* Polygres.Client
+  const readiness = yield* polygres.readiness()
+
+  const firstPage = yield* polygres.text.tsvector.page({
+    query: "intrusion campaign",
+    config: "evidence_body",
+    limit: 50,
+  })
+
+  const topHundred = yield* polygres.vector.search
+    .stream({
+      embedding: [0.1, 0.2],
+      config: "evidence_embeddings",
+      minSimilarity: 0.8,
+      limit: 50,
+    })
+    .pipe(Stream.take(100), Stream.runCollect)
+
+  return { readiness, firstPage, topHundred }
+}).pipe(
+  Effect.catchTag("Polygres.RateLimited", (error) =>
+    Effect.logWarning("Polygres rate limited the request", { requestId: error.requestId }),
+  ),
+  Effect.provide(PolygresLive),
   Effect.provide(FetchHttpClient.layer),
-  Effect.runPromise,
 )
+
+await Effect.runPromise(program)
 ```
 
-`make` requires `HttpClient.HttpClient`, so production code can provide the fetch layer while tests and simulations provide an in-memory client. `layer(options)` provides the `PolygresClient` service for application-level dependency injection.
+`Polygres.make(options)` constructs a client directly and retains `HttpClient.HttpClient` in its requirement channel. `Polygres.layer(options)` provides the yieldable `Polygres.Client` service while preserving that same transport requirement.
 
-## Current Surface
+## API Shape
 
-- Retrieval readiness and passwordless connection metadata
-- Graph expand, neighborhood, related, path, and connection
-- Vector search and similar-row retrieval
-- PostgreSQL full-text and fuzzy search
-- Graph-first, vector-first, and joint hybrid retrieval
-- Runtime response decoding with Effect Schema
-- Typed configuration, transport, decode, authentication, permission, rate-limit, maintenance, not-found, and generic API errors
-- Protected authentication/version headers and secret redaction
-- Bounded transient retries and request timeouts
-- Lazy cursor pagination as an Effect `Stream`
-- Checked compatibility against pinned OpenAPI and official SDK method manifests
+- Nullary Runtime methods: `polygres.readiness()` and `polygres.connectionInfo()`.
+- Object inputs: `polygres.graph.path({ source, target, maxDepth: 5 })`.
+- Paginated reads: `polygres.vector.search.page(input)`.
+- Cold auto-pagination: `polygres.vector.search.stream(inputWithoutCursor)`.
+- Domain schemas and types: `Runtime.Readiness`, `Graph.PathInput`, `Vector.Result`, and peers.
+- Narrow errors: construction returns `PolygresError.Configuration`; retrieval returns `PolygresError.Request | PolygresError.InvalidInput`.
+- CamelCase public models with Runtime wire names confined to private adapters.
+- `Option` for nullable cursors, request IDs, and ranking fields.
 
-The first release intentionally excludes row writes and pgContext administration. Those mutation surfaces need idempotency and ambiguous-write semantics that should not be rushed into the read-path release.
+`timeout` limits each HTTP attempt independently. Set `deadline` when the complete operation, including retries, backoff, response reading, and schema adaptation, must share one time budget. Both options accept Effect `Duration.Input` values.
 
-See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for runtime support and contract policy, and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the path to full Runtime SDK parity.
+The stable retrieval surface contains readiness and passwordless connection metadata plus graph, vector, PostgreSQL text, and hybrid retrieval. Row writes and pgContext administration remain deferred until their idempotency, ambiguous-write, and operation-wait semantics have dedicated contracts.
+
+See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+## Contract Updates
+
+```sh
+bun run contracts:refresh -- check
+bun run contracts:refresh -- update --format prompt
+```
+
+The updater downloads exact canonical artifacts from one immutable official upstream commit, validates linked request/response schemas, and emits stable JSON or a task suitable for any coding agent. It never executes upstream code or rewrites the SDK automatically. See [`docs/CONTRACT_REFRESH.md`](docs/CONTRACT_REFRESH.md).
 
 ## Development
 
@@ -69,10 +90,6 @@ bun install
 bun run check
 ```
 
-For a live readiness check, set `POLY_API_KEY` and either `POLY_PROJECT_ID` or `POLY_RUNTIME_URL`, then run:
-
-```sh
-bun run live:readiness
-```
+For a secret-safe live readiness check, set `POLY_API_KEY` and either `POLY_PROJECT_ID` or `POLY_RUNTIME_URL`, then run `bun run live:readiness`.
 
 Never commit Project API keys or PostgreSQL passwords.

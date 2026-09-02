@@ -2,13 +2,16 @@
 
 ## Runtime Contract
 
-The repository pins three machine-readable artifacts under `contracts/`:
+The repository pins the Effect surface plus three upstream artifacts under `contracts/`:
 
 - `runtime-v1.openapi.json`: upstream Runtime API snapshot.
 - `python-sdk-v1.methods.json`: upstream official SDK behavior inventory.
+- `python-sdk-v1.errors.py`: inert upstream canonical error catalog source; it is hashed and never executed.
 - `effect-sdk-v1.surface.json`: operations implemented by this SDK.
 
-`bun run contracts:check` fails when an implemented operation is absent from either upstream contract or when the API behavior version differs. Contract snapshot updates must be reviewed separately from generated client changes.
+`bun run contracts:check` validates operation identity, method/path bindings, lock structure, and local snapshot integrity without network access. This proves consistency among the checked-in files, not that the recorded commit exists remotely. `bun run contracts:refresh -- check` asks GitHub to resolve the official upstream repository and reports method and reachable request/response schema drift. See [`CONTRACT_REFRESH.md`](CONTRACT_REFRESH.md) for the update and agent handoff loop.
+
+`effect-sdk-v1.surface.json` uses two distinct version fields. `default_api_version` is the exact Runtime behavior pin and must equal the locked manifest. `upstream_sdk_version` is the minimum upstream Python SDK version accepted for the declared Effect surface; it is strict SemVer, may be older than the current lock, and may never be newer. It is not automatically advanced by contract refreshes.
 
 ## Version Policy
 

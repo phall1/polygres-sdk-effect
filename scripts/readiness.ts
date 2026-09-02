@@ -1,14 +1,14 @@
-import { Effect, Redacted } from "effect"
+import { Effect, Option, Redacted } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
 
-import { make } from "../src/index.js"
+import { Polygres } from "../src/index.js"
 
 const apiKey = process.env.POLY_API_KEY ?? ""
 const projectId = process.env.POLY_PROJECT_ID
 const runtimeUrl = process.env.POLY_RUNTIME_URL || undefined
 
 const program = Effect.gen(function* () {
-  const client = yield* make({
+  const client = yield* Polygres.make({
     apiKey: Redacted.make(apiKey),
     ...(projectId === undefined ? {} : { projectId }),
     ...(runtimeUrl === undefined ? {} : { runtimeUrl }),
@@ -17,8 +17,8 @@ const program = Effect.gen(function* () {
   console.log(
     JSON.stringify(
       {
-        projectId: readiness.project_id,
-        requestId: readiness.request_id,
+        projectId: readiness.projectId,
+        requestId: Option.getOrUndefined(readiness.requestId),
         graph: readiness.graph.ready,
         vector: readiness.vector.ready,
         hybrid: readiness.hybrid.ready,

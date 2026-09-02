@@ -34,4 +34,4 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: bun install --frozen-lockfile
       - run: bun run build
-      - run: node --input-type=module -e 'const sdk = await import("./dist/index.js"); if (!sdk.PolygresClient || !sdk.paginate || !sdk.Polygres.make) process.exit(1)'
+      - run: node --input-type=module -e 'const sdk = await import("./dist/index.js"); if (!sdk.Polygres?.Client || !sdk.Polygres?.make || !sdk.Vector?.SearchInput || !sdk.PolygresError?.InvalidInput) process.exit(1)'

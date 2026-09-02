@@ -6,8 +6,19 @@ All notable changes will be documented here.
 
 ### Added
 
-- Effect 4 service and layer for the Polygres Runtime API.
-- Initial 14-method graph, vector, text, and hybrid retrieval surface.
-- Strict Effect Schema response decoding and tagged failures.
-- Effect Stream pagination helper.
-- Upstream OpenAPI and SDK-surface drift verification.
+- Domain module exports for `Polygres`, `Entity`, `Runtime`, `Graph`, `Vector`, `Text`, `Hybrid`, `Page`, and `PolygresError`.
+- Schema-owned object inputs and normalized camelCase result models.
+- Paired cold `.page()` and `.stream()` operations for every paginated retrieval method.
+- Domain-qualified, lifecycle-specific errors with narrow construction and request unions.
+- Immutable upstream contract provenance, semantic drift reports, scheduled checks, and agent-neutral update prompts.
+- Compile-time API, error, stream, and Layer requirement proofs.
+- Packed Bun/Node import and browser consumer-bundle verification.
+
+### Fixed
+
+- Graph path and connection requests no longer contain forbidden search fields.
+- Nested `null` filter values are preserved.
+- Hybrid results always contain normalized identity, properties, and score fields.
+- Non-finite ranking values and non-JSON success responses fail as invalid responses.
+- Non-JSON HTTP failures map by status, maintenance responses are not retried, and synchronized connection metadata fails closed.
+- Empty pagination cursors terminate streams and echoed credentials are redacted from request IDs.

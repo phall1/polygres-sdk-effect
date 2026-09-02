@@ -1,15 +1,11 @@
-import { API_VERSION, fromEnv, layer, make, PolygresClient, VERSION } from "./client.js"
+import * as Entity from "./Entity.js"
+import * as Graph from "./Graph.js"
+import * as Hybrid from "./Hybrid.js"
+import * as Page from "./Page.js"
+import * as Polygres from "./Polygres.js"
+import * as PolygresError from "./PolygresError.js"
+import * as Runtime from "./Runtime.js"
+import * as Text from "./Text.js"
+import * as Vector from "./Vector.js"
 
-export * from "./client.js"
-export * from "./errors.js"
-export * from "./pagination.js"
-export * from "./schemas.js"
-
-export const Polygres = {
-  API_VERSION,
-  Client: PolygresClient,
-  VERSION,
-  fromEnv,
-  layer,
-  make,
-} as const
+export { Entity, Graph, Hybrid, Page, Polygres, PolygresError, Runtime, Text, Vector }

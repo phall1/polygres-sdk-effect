@@ -3,19 +3,19 @@
   "default_api_version": "2026-08-04",
   "upstream_sdk_version": "0.4.1",
   "methods": [
-    { "public_name": "connectionInfo", "method": "GET", "path": "/v1/connection-info" },
-    { "public_name": "readiness", "method": "GET", "path": "/v1/retrieval/readiness" },
-    { "public_name": "graph.expand", "method": "POST", "path": "/v1/graph/expand" },
-    { "public_name": "graph.neighborhood", "method": "POST", "path": "/v1/graph/neighborhood" },
-    { "public_name": "graph.related", "method": "POST", "path": "/v1/graph/related" },
-    { "public_name": "graph.path", "method": "POST", "path": "/v1/graph/path" },
-    { "public_name": "graph.connection", "method": "POST", "path": "/v1/graph/connection" },
-    { "public_name": "vector.search", "method": "POST", "path": "/v1/vector/search" },
-    { "public_name": "vector.similarTo", "method": "POST", "path": "/v1/vector/similar-to" },
-    { "public_name": "text.tsvector", "method": "POST", "path": "/v1/text/tsvector" },
-    { "public_name": "text.fuzzy", "method": "POST", "path": "/v1/text/fuzzy" },
-    { "public_name": "hybrid.graphFirst", "method": "POST", "path": "/v1/hybrid/graph-first" },
-    { "public_name": "hybrid.vectorFirst", "method": "POST", "path": "/v1/hybrid/vector-first" },
-    { "public_name": "hybrid.joint", "method": "POST", "path": "/v1/hybrid/joint" }
+    { "public_name": "connectionInfo", "operation_id": "runtime_connection_info_get", "method": "GET", "path": "/v1/connection-info" },
+    { "public_name": "readiness", "operation_id": "runtime_retrieval_readiness", "method": "GET", "path": "/v1/retrieval/readiness" },
+    { "public_name": "graph.expand", "operation_id": "runtime_graph_expand", "method": "POST", "path": "/v1/graph/expand" },
+    { "public_name": "graph.neighborhood", "operation_id": "runtime_graph_neighborhood", "method": "POST", "path": "/v1/graph/neighborhood" },
+    { "public_name": "graph.related", "operation_id": "runtime_graph_related", "method": "POST", "path": "/v1/graph/related" },
+    { "public_name": "graph.path", "operation_id": "runtime_graph_path", "method": "POST", "path": "/v1/graph/path" },
+    { "public_name": "graph.connection", "operation_id": "runtime_graph_connection", "method": "POST", "path": "/v1/graph/connection" },
+    { "public_name": "vector.search", "operation_id": "runtime_vector_search", "method": "POST", "path": "/v1/vector/search" },
+    { "public_name": "vector.similarTo", "operation_id": "runtime_vector_similar_to", "method": "POST", "path": "/v1/vector/similar-to" },
+    { "public_name": "text.tsvector", "operation_id": "runtime_text_tsvector", "method": "POST", "path": "/v1/text/tsvector" },
+    { "public_name": "text.fuzzy", "operation_id": "runtime_text_fuzzy", "method": "POST", "path": "/v1/text/fuzzy" },
+    { "public_name": "hybrid.graphFirst", "operation_id": "runtime_hybrid_graph_first", "method": "POST", "path": "/v1/hybrid/graph-first" },
+    { "public_name": "hybrid.vectorFirst", "operation_id": "runtime_hybrid_vector_first", "method": "POST", "path": "/v1/hybrid/vector-first" },
+    { "public_name": "hybrid.joint", "operation_id": "runtime_hybrid_joint", "method": "POST", "path": "/v1/hybrid/joint" }
   ]
 }

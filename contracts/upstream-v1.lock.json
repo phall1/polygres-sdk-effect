@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/Evokoa/polygres-sdk",
+  "tracking_ref": "refs/heads/main",
+  "resolved_commit": "223c22a720317eb016a498421f61684a997d158c",
+  "sdk_version": "0.4.1",
+  "artifacts": {
+    "runtime-v1.openapi.json": {
+      "source": "src/polygres/spec/runtime-v1.openapi.json",
+      "sha256": "db23d7178d295d7bac0b5168061c59fcbcf6eb96e1e12bc2e21670452b8cb506"
+    },
+    "python-sdk-v1.methods.json": {
+      "source": "src/polygres/spec/python-sdk-v1.methods.json",
+      "sha256": "eb0833a4e3ccfc24df6f029fb7611acb6c003f44a76e46f0454a2975691f013a"
+    },
+    "python-sdk-v1.errors.py": {
+      "source": "src/polygres/_vendor/polygres_lib/errors/generated.py",
+      "sha256": "3dc0d3542c89ff8b8c85ebb4412bf31ce46b2f5945a43aa276588b0e23c9631d"
+    }
+  }
+}
