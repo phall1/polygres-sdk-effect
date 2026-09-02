@@ -18,6 +18,10 @@ All notable changes will be documented here.
 - Deterministic generators for the 102-method HTTP surface and 688-entry canonical error catalog.
 - Type-aware OXC linting and formatting with explicit CI gates.
 
+### Changed
+
+- The minimum supported Node.js version is now 22.
+
 ### Fixed
 
 - Graph path and connection requests no longer contain forbidden search fields.

@@ -33,7 +33,7 @@ Retry behavior follows `python-sdk-v1.methods.json`, not HTTP verb inference or 
 The distributed package uses web-standard APIs through Effect's `HttpClient` service and does not bundle a transport implementation. It supports:
 
 - Bun 1.4 or newer
-- Node.js 20 or newer
+- Node.js 22 or newer
 - Cloudflare Workers
 - Other runtimes that can provide an Effect 4 `HttpClient.HttpClient`
 

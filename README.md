@@ -13,7 +13,7 @@ Graph, vector, text, hybrid search, safe row writes, and full pgContext, built d
 - Typed failures instead of mystery exceptions
 - Cold Effect streams for cursor pagination
 - Safe idempotency, deadlines, and operation polling
-- Bun, Node.js 20+, and web-standard runtime support
+- Bun, Node.js 22+, and web-standard runtime support
 
 ## Try It
 

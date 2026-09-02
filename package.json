@@ -55,7 +55,7 @@
   "homepage": "https://github.com/phall1/polygres-sdk-effect#readme",
   "engines": {
     "bun": ">=1.4.0",
-    "node": ">=20"
+    "node": ">=22"
   },
   "peerDependencies": {
     "effect": ">=4.0.0-rc.112 <5"
